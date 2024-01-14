@@ -1,2 +1,2 @@
 # retrodeep-cli
-Build. Deploy. Scale
+Build. Deploy. Scale 🚀
