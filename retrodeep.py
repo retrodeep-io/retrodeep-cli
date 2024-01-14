@@ -258,9 +258,13 @@ def init(args):
         deploy_from_local(token, username, email, retrodeep_access_token)
     else:
         # Continue with the repo deployment process
-        # We'll modify the deploy_from_repo function to prompt for the repo name if it's None
         deploy_from_repo(token, username, email, retrodeep_access_token)
 
+def deployUsingFlags(args):
+    credentials = login_for_workflow()
+
+    print(f"Deploying Project Name: \033[1m{args.project_name}\033[0m")
+    print(f"From directory: \033[1m{args.directory_path}\033[0m")
 
 def logout(args):
     retrodeep_dir = os.path.join(os.path.expanduser('~'), '.retrodeep')
@@ -283,14 +287,19 @@ def login(args):
         sys.exit(1)
     else:
         print("> No Credentials found. You are not currently logged in to retrodeep.")
-        # Initiate GitHub OAuth process and retrieve token and email
-        token, username, email, retrodeep_access_token = initiate_github_oauth()
-        # If the user was successfully added or already exists, store their session
+        print("> Authenticate with GitHub to proceed with Retrodeep:")
+        with yaspin(text="\033[1mAuthenticating...\033[0m", color="cyan") as spinner:
+             # Initiate GitHub OAuth process and retrieve token and email
+            token, username, email, retrodeep_access_token = initiate_github_oauth()
+            if token:
+                spinner.text = "\033[1mAuthentication completed\033[0m"
+                spinner.ok("✔")
+        # print("Authentication completed.")
         if username and email and token and retrodeep_access_token:
             login_message(email)
             manage_user_session(username, token, email, retrodeep_access_token)
         else:
-            print("> Failed to authenticate or create user.")
+            print("> Failed to authenticate.")
             sys.exit(1)
 
 
@@ -300,9 +309,13 @@ def login_for_workflow():
         return credentials
     else:
         print("> No Credentials found. You are not currently logged in to Retrodeep.")
+        print("> Authenticate with GitHub to proceed with Retrodeep:")
 
-        # Initiate GitHub OAuth process and retrieve token and email
-        token, username, email, retrodeep_access_token = initiate_github_oauth()
+        with yaspin(text="\033[1mAuthenticating...\033[0m", color="cyan") as spinner:
+             # Initiate GitHub OAuth process and retrieve token and email
+            token, username, email, retrodeep_access_token = initiate_github_oauth()
+            if token:
+                spinner.ok("✔")
 
         # If the user was successfully added or already exists, store their session
         if username and email and token and retrodeep_access_token:
@@ -317,7 +330,7 @@ def login_for_workflow():
 
 def login_message(email):
     print(
-        f"🎉 You have successfully authenticated with GitHub as \033[1m{email}\033[0m")
+        f"> You have successfully authenticated with GitHub as \033[1m{email}\033[0m")
     print(
         f"Welcome aboard! Enjoy your journey with Retrodeep! 🚀")
 
@@ -524,7 +537,7 @@ def wait_for_oauth_completion(session_id, timeout=300, interval=3):
             f"{AUTH_BASE_URL}/is_ready?session_id={session_id}")
 
         if ready_response.status_code == 200 and ready_response.json().get('ready'):
-            print("\n> Authentication completed.")
+            # print("\n> Authentication completed.")
             break
         elif ready_response.status_code == 204:
             # OAuth process not completed, wait for the next check
@@ -722,12 +735,23 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, Exit_gracefully)
 
     parser = argparse.ArgumentParser(description="Retrodeep CLI")
-    subparsers = parser.add_subparsers(dest="command")
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     # Deploy command
-    parser_deploy = subparsers.add_parser(
-        "deploy", help="Deploy your project locally or from a git repository")
+    parser_deploy = subparsers.add_parser("deploy", help="Deploy your project locally or from a git repository")
     parser_deploy.set_defaults(func=init)
+
+    # # Deploy via flags
+    # parser_deployUsingFlags = subparsers.add_parser("deploy", help="Deploy your project")
+    # parser_deployUsingFlags.add_argument("-p", "--project-name", required=True, help="Name of the project to deploy")
+    # parser_deployUsingFlags.add_argument("-d", "--directory-path", required=True, help="Path to the project directory")
+    # parser_deployUsingFlags.add_argument("-e", "--env", help="Environment variables (optional)")
+    # parser_deployUsingFlags.set_defaults(func=deployUsingFlags)
+
+    # parser_deployProjects = subparsers.add_parser("deploy", help="Directly deploy from Local Dir")
+    # parser_deployProjects.add_argument("project_name", help="Name of the project to delete")
+    # parser_deployProjects.set_defaults(func=delete_project) 
+
 
     # Login command
     parser_login = subparsers.add_parser(
