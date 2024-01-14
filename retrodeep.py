@@ -49,13 +49,6 @@ class Style:
     DIM = '\033[2m'
 
 
-# # Spinner generator function
-# def spinner():
-#     spinner_chars = itertools.cycle(['-', '\\', '|', '/'])
-#     while True:
-#         yield next(spinner_chars)
-
-
 # Set to store previously generated codes to ensure uniqueness
 generated_codes = set()
 
@@ -151,9 +144,8 @@ def deploy_from_local(token, username, email, retrodeep_access_token):
 
 
 def deploy_from_repo(token, username, email, retrodeep_access_token):
-
     repos = list_user_repos(token)
-
+    
     # The prompt for selecting a repository
     if repos:
         questions = [
@@ -168,7 +160,6 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         repo_name = answers['repo']
         # Proceed with the selected repository
     else:
-        # repos list is empty, handled within list_user_repos function
         print("You do not have any repositories")
         sys.exit(1)
         pass
@@ -176,6 +167,7 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     # Fetch the directories from the repository
     directories = get_repo_directories(token, username, repo_name)
 
+    # Prompt to choose user project
     name_of_project_question = {
         'type': 'input',
         'name': 'project_name',
@@ -248,7 +240,6 @@ def init(args):
         print("> No existing Retrodeep credentials detected. Please authenticate")
         print("> Authenticate with GitHub to proceed with Retrodeep:")
         token, username, email, retrodeep_access_token = initiate_github_oauth()
-
         manage_user_session(username, token, email)
 
     print(f"Hi {username}!")
@@ -273,7 +264,6 @@ def init(args):
 
 def logout(args):
     retrodeep_dir = os.path.join(os.path.expanduser('~'), '.retrodeep')
-
     if os.path.exists(retrodeep_dir):
         try:
             shutil.rmtree(retrodeep_dir)
@@ -306,7 +296,6 @@ def login(args):
 
 def login_for_workflow():
     credentials = get_stored_credentials()
-
     if credentials:
         return credentials
     else:
@@ -335,8 +324,7 @@ def login_message(email):
 
 def list_projects(args):
     credentials = login_for_workflow()
-
-    token = credentials['access_token']
+    
     username = credentials['username']
     email = credentials['email_address']
     retrodeep_access_token = credentials['retrodeep_access_token']
@@ -346,10 +334,8 @@ def list_projects(args):
 
 def delete_project(args):
     credentials = login_for_workflow()
-
-    token = credentials['access_token']
+    
     username = credentials['username']
-    email = credentials['email_address']
     retrodeep_access_token = credentials['retrodeep_access_token']
 
     project_name = args.project_name
@@ -362,12 +348,8 @@ def delete_project(args):
             print(
                 f"You're about to remove the project: \033[1m{project_name}\033[0m")
             print("This would permanently delete all its deployments and dependencies")
+            
             if confirm_action(f"> {Style.RED}\033[1mAre you sure?\033[0m{Style.RESET}"):
-                # try:
-                #     delete_project_request(
-                #         username, args.project_name, retrodeep_access_token)
-                # except Exception as e:
-                #     print(f"Error deleting project: {e}")
                 delete_project_request(
                     username, args.project_name, retrodeep_access_token)
             else:
@@ -401,7 +383,7 @@ def manage_user_session(username, access_token, email_address, retrodeep_access_
     app_dir = Path.home() / '.retrodeep'
     credentials_file = app_dir / 'credentials.json'
 
-    # Check if the .yourapp directory exists, create if not
+    # Check if the .retrodeep directory exists, create if not
     if not app_dir.exists():
         app_dir.mkdir()
 
@@ -417,10 +399,7 @@ def manage_user_session(username, access_token, email_address, retrodeep_access_
 
 
 def format_days_since(updated_at_str):
-    # Parsing the string to datetime object
     updated_at = datetime.strptime(updated_at_str, '%a, %d %b %Y %H:%M:%S %Z')
-
-    # Calculating the difference in days and hours
     time_diff = datetime.utcnow() - updated_at
     days_diff = time_diff.days
     hours_diff = time_diff.seconds // 3600  # Convert seconds to hours
@@ -496,7 +475,7 @@ def add_new_project(username, email, project_name, domain_name, repo_name, retro
     response = requests.post(url, json=data, headers=headers)
 
     try:
-        response_data = response.json()  # Try to parse JSON response
+        response_data = response.json() 
     except ValueError:
         response_data = None
 
@@ -537,9 +516,7 @@ def initiate_github_oauth():
 
 
 def wait_for_oauth_completion(session_id, timeout=300, interval=3):
-
     start_time = time.time()
-    dot_count = 0
 
     while time.time() - start_time < timeout:
         # Check if the OAuth process is completed and the token is ready
@@ -650,24 +627,24 @@ def generate_unique_code(length=4):
             return code
 
 
-# def detect_project_type(token, repo_name):
-#     headers = {
-#         'Authorization': f'token {token}',
-#         'Accept': 'application/vnd.github.v3+json'
-#     }
-#     url = f"https://api.github.com/repos/{org_name}/{repo_name}/contents/package.json"
-#     response = requests.get(url, headers=headers)
+def detect_project_type(token, repo_name, org_name):
+    headers = {
+        'Authorization': f'token {token}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    url = f"https://api.github.com/repos/{org_name}/{repo_name}/contents/package.json"
+    response = requests.get(url, headers=headers)
 
-#     if response.status_code == 200:
-#         package_content = base64.b64decode(response.json()['content']).decode()
-#         package_json = json.loads(package_content)
+    if response.status_code == 200:
+        package_content = base64.b64decode(response.json()['content']).decode()
+        package_json = json.loads(package_content)
 
-#         dependencies = package_json.get("dependencies", {})
-#         if "next" in dependencies:
-#             return "nextjs"
-#         elif "react" in dependencies and "react-dom" in dependencies:
-#             return "react"
-#     return "html"
+        dependencies = package_json.get("dependencies", {})
+        if "next" in dependencies:
+            return "nextjs"
+        elif "react" in dependencies and "react-dom" in dependencies:
+            return "react"
+    return "html"
 
 
 def detect_package_manager(token, org_name, repo_name):
@@ -689,7 +666,6 @@ def detect_package_manager(token, org_name, repo_name):
     elif response_npm.status_code == 200:
         return "npm"
     else:
-        # If neither lock file is found, check package.json for clues
         package_url = f"https://api.github.com/repos/{org_name}/{repo_name}/contents/package.json"
         response_package = requests.get(package_url, headers=headers)
         if response_package.status_code == 200:
@@ -724,11 +700,9 @@ def upload_file(zip_file_path, project_name, repo_name, username, directory, ret
             response = requests.post(
                 f"{SCM_BASE_URL}/upload", files=files, data=data, headers=headers)
 
-        # Check if the request was successful
         if response.status_code == 200:
             return response.json()
         else:
-            # Return a message or data indicating the failure
             return {"error": f"Failed to upload. Status code: {response.status_code}"}
 
     except requests.exceptions.RequestException as e:
@@ -783,22 +757,6 @@ if __name__ == "__main__":
     parser_whoami = subparsers.add_parser(
         "whoami", help="Shows the currently logged in user")
     parser_whoami.set_defaults(func=whoami)
-
-    # # retrodeep init
-    # init_parser = subparsers.add_parser("init")
-
-    # # retrodeep ls (You can expand on this later)
-    # ls_parser = subparsers.add_parser("ls")
-
-    # args = parser.parse_args()
-
-    # if args.command == "init":
-    #     init()
-    # elif args.command == "ls":
-    #     # Implement the ls function
-    #     pass
-
-    # main()
 
     args = parser.parse_args()
     if hasattr(args, 'func'):
