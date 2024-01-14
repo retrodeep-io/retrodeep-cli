@@ -1,0 +1,25 @@
+###### Requirements without Version Specifiers ######
+flask
+requests
+PyGithub
+PyInquirer
+GitPython
+# threading
+argparse
+# shutil
+# models
+tqdm
+datetime
+pathlib
+clint
+sqlalchemy
+pymysql
+# re
+# itertools
+questionary
+gunicorn
+requests_oauthlib 
+waitress
+cryptography
+uuid
+yaspin
