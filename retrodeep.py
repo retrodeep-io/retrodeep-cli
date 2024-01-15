@@ -64,7 +64,7 @@ KEY_FILE = os.path.join(config_directory, "encryption.key")
 TOKEN_FILE = os.path.join(config_directory, "user_token.enc")
 
 
-def deploy_from_local(token, username, email, retrodeep_access_token):
+def deploy_from_local(username, email, retrodeep_access_token):
 
     project_name_question = {
         'type': 'input',
@@ -253,7 +253,7 @@ def init(args):
 
     if answers['source'] == 'Local Directory':
         # Continue with the deployment process
-        deploy_from_local(token, username, email, retrodeep_access_token)
+        deploy_from_local(username, email, retrodeep_access_token)
     else:
         # Continue with the repo deployment process
         deploy_from_repo(token, username, email, retrodeep_access_token)
