@@ -47,6 +47,7 @@ class Style:
     RESET = '\033[0m'
     BOLD = '\033[1m'
     DIM = '\033[2m'
+    CYAN = '\033[36m'
 
 
 # Set to store previously generated codes to ensure uniqueness
@@ -106,14 +107,11 @@ def deploy_from_local(token, username, email, retrodeep_access_token):
         else:
             print("Invalid directory. Please enter a valid directory path.")
 
-    repo_name = f"{project_name}-{username}"
-
     zip_file_path = compress_directory(absolute_path, project_name)
 
     with yaspin(text="\033[1mInitializing Deployment...\033[0m", color="cyan") as spinner:
         # Fork the selected repository to the organization
-        workflow = upload_file(zip_file_path, project_name,
-                               repo_name, username, "./", retrodeep_access_token)
+        workflow = upload_file(zip_file_path, project_name, username, "./", retrodeep_access_token)
         os.remove(zip_file_path)
 
         if workflow.get('status') == 'completed':
@@ -260,11 +258,67 @@ def init(args):
         # Continue with the repo deployment process
         deploy_from_repo(token, username, email, retrodeep_access_token)
 
-def deployUsingFlags(args):
-    credentials = login_for_workflow()
+def deploy_using_flags(args):
+    credentials = get_stored_credentials()
+    if credentials:
+        token = credentials['access_token']
+        username = credentials['username']
+        email = credentials['email_address']
+        retrodeep_access_token = credentials['retrodeep_access_token']
 
-    print(f"Deploying Project Name: \033[1m{args.project_name}\033[0m")
-    print(f"From directory: \033[1m{args.directory_path}\033[0m")
+    else:
+        # If no credentials, initiate OAuth
+        print("> No existing Retrodeep credentials detected. Please authenticate")
+        print("> Authenticate with GitHub to proceed with Retrodeep:")
+        token, username, email, retrodeep_access_token = initiate_github_oauth()
+        manage_user_session(username, token, email)
+
+    absolute_path = os.path.abspath(args.dir)
+    
+    if args.dir and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
+        # Check for the existence of .html file
+        if glob.glob(os.path.join(absolute_path, '*.html')):
+            print(f"You are about to deploy the project \033[1m{args.name}\033[0m from the directory: \033[1m{absolute_path}\033[0m")
+            
+            if confirm_action(f"> {Style.CYAN}\033[1mDo you want to continue? \033[0m{Style.CYAN}"):
+
+                zip_file_path = compress_directory(absolute_path, args.name)
+
+                with yaspin(text="\033[1mInitializing Deployment...\033[0m", color="cyan") as spinner:
+                    # Fork the selected repository to the organization
+                    workflow = upload_file(zip_file_path, args.name, username, "./", retrodeep_access_token)
+                    os.remove(zip_file_path)
+
+                    if workflow.get('status') == 'completed':
+                        spinner.ok("✔")
+
+                start_time = time.time()
+
+                # Check if workflow completed successfully
+                if workflow.get('conclusion') == "success":
+                    with yaspin(text="\033[1mFinalizing Setup...\033[0m", color="cyan") as spinner:
+                        while not is_domain_up(workflow.get('url2')):
+                            time.sleep(0.200)
+                        spinner.ok("✔")
+
+                    duration = round(time.time() - start_time, 2)
+                    with yaspin(text=f"\033[1mDeploy Succeeded [{duration}s]\033[0m", color="cyan") as spinner:
+                        spinner.ok("✔")
+                    print(
+                        f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
+                    print("> 🎉 Congratulations! Your project is now up and running.")
+                else:
+                    print("\nDeployment failed.")
+                
+                add_new_project(username, email, args.name, workflow.get('domain_name'),
+                    workflow.get('forked_repo_name'), retrodeep_access_token)
+            else:
+                print("> Operation canceled")
+                sys.exit(1)
+    else:
+        print("Invalid directory. Please enter a valid directory path.")
+
+    sys.exit(0)
 
 def logout(args):
     retrodeep_dir = os.path.join(os.path.expanduser('~'), '.retrodeep')
@@ -362,7 +416,7 @@ def delete_project(args):
                 f"You're about to remove the project: \033[1m{project_name}\033[0m")
             print("This would permanently delete all its deployments and dependencies")
             
-            if confirm_action(f"> {Style.RED}\033[1mAre you sure?\033[0m{Style.RESET}"):
+            if confirm_action(f"> {Style.RED}\033[1mAre you sure?\033[0m{Style.RESET} {Style.GREY}Y/n{Style.RESET}"):
                 delete_project_request(
                     username, args.project_name, retrodeep_access_token)
             else:
@@ -425,7 +479,7 @@ def format_days_since(updated_at_str):
 
 def confirm_action(prompt):
     while True:
-        response = input(prompt + " [Y/n]: ").strip().lower()
+        response = input(prompt + f" {Style.GREY}[Y/n]{Style.RESET}: ").strip().lower()
         if response in ('y', 'n', ''):
             return response == 'y'
         else:
@@ -449,7 +503,7 @@ def get_user_projects(username, retrodeep_access_token, email_address):
         projects_list = [
             {
                 '\033[1mProject Name\033[0m': f" \033[1m{project['project_name']}\033[0m",
-                '\033[1mDeployment URL\033[0m': f"https://{project['domain_name']}.retrodeep.com",
+                '\033[1mDeployment URL\033[0m': f"https://{project['domain_name']}.retrodeep.app",
                 '\033[1mLast Updated\033[0m': format_days_since(project['updated_at'])
             }
             for project in projects_data
@@ -699,14 +753,13 @@ def compress_directory(source_dir, output_filename):
     return f"{output_filename}.zip"
 
 
-def upload_file(zip_file_path, project_name, repo_name, username, directory, retrodeep_access_token):
+def upload_file(zip_file_path, project_name, username, directory, retrodeep_access_token):
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
     try:
         with open(zip_file_path, 'rb') as f:
             files = {'file': (os.path.basename(zip_file_path), f)}
             data = {
                 'project_name': project_name,
-                'repo_name': repo_name,
                 'username': username,
                 'directory': directory
             }
@@ -738,20 +791,10 @@ if __name__ == "__main__":
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     # Deploy command
-    parser_deploy = subparsers.add_parser("deploy", help="Deploy your project locally or from a git repository")
+    parser_deploy = subparsers.add_parser("deploy", help="Deploy your project locally or from a git repository")    
+    parser_deploy.add_argument("-n", "--name", help="Name of the project")
+    parser_deploy.add_argument("-d", "--dir", help="Directory path for deployment")
     parser_deploy.set_defaults(func=init)
-
-    # # Deploy via flags
-    # parser_deployUsingFlags = subparsers.add_parser("deploy", help="Deploy your project")
-    # parser_deployUsingFlags.add_argument("-p", "--project-name", required=True, help="Name of the project to deploy")
-    # parser_deployUsingFlags.add_argument("-d", "--directory-path", required=True, help="Path to the project directory")
-    # parser_deployUsingFlags.add_argument("-e", "--env", help="Environment variables (optional)")
-    # parser_deployUsingFlags.set_defaults(func=deployUsingFlags)
-
-    # parser_deployProjects = subparsers.add_parser("deploy", help="Directly deploy from Local Dir")
-    # parser_deployProjects.add_argument("project_name", help="Name of the project to delete")
-    # parser_deployProjects.set_defaults(func=delete_project) 
-
 
     # Login command
     parser_login = subparsers.add_parser(
@@ -783,6 +826,13 @@ if __name__ == "__main__":
     parser_whoami.set_defaults(func=whoami)
 
     args = parser.parse_args()
+
+    if args.command == "deploy":
+        if args.name and args.dir:
+            deploy_using_flags(args)
+        else:
+            init(args)
+
     if hasattr(args, 'func'):
         args.func(args)
     else:
