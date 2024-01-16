@@ -132,11 +132,13 @@ def deploy_from_local(username, email, retrodeep_access_token):
         print(
             f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
         print("> 🎉 Congratulations! Your project is now up and running.")
+        add_new_project(username, email, project_name, workflow.get('domain_name'),
+                    workflow.get('full_repo_name'), retrodeep_access_token)
     else:
         print("\nDeployment failed.")
 
     add_new_project(username, email, project_name, workflow.get('domain_name'),
-                    workflow.get('forked_repo_name'), retrodeep_access_token)
+                    workflow.get('full_repo_name'), retrodeep_access_token)
 
     sys.exit(0)
 
@@ -215,11 +217,11 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         print(
             f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
         print("> 🎉 Congratulations! Your project is now up and running.")
+        add_new_project(username, email, name_of_project, workflow.get('domain_name'),
+                    workflow.get('forked_repo_name'), retrodeep_access_token)
+
     else:
         print("\nDeployment failed.")
-
-    add_new_project(username, email, name_of_project, workflow.get('domain_name'),
-                    workflow.get('forked_repo_name'), retrodeep_access_token)
 
     sys.exit(0)
 
@@ -311,7 +313,7 @@ def deploy_using_flags(args):
                     print("\nDeployment failed.")
                 
                 add_new_project(username, email, args.name, workflow.get('domain_name'),
-                    workflow.get('forked_repo_name'), retrodeep_access_token)
+                    workflow.get('full_repo_name'), retrodeep_access_token)
             else:
                 print("> Operation canceled")
                 sys.exit(1)
