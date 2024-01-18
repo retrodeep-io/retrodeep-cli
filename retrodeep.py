@@ -60,19 +60,9 @@ config_directory = os.path.join(home, ".retrodeep")
 if not os.path.exists(config_directory):
     os.makedirs(config_directory)
 
-KEY_FILE = os.path.join(config_directory, "encryption.key")
-TOKEN_FILE = os.path.join(config_directory, "user_token.enc")
-
-
 def deploy_from_local(username, email, retrodeep_access_token):
 
-    project_name_question = {
-        'type': 'input',
-        'name': 'project_name',
-        'message': 'Enter the project name (for subdomain):'
-    }
-
-    project_name = prompt(project_name_question)['project_name']
+    project_name = name_of_project_prompt(username, retrodeep_access_token)
 
     while True:
         directory_question = {
@@ -167,15 +157,7 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     # Fetch the directories from the repository
     directories = get_repo_directories(token, username, repo_name)
 
-    # Prompt to choose user project
-    name_of_project_question = {
-        'type': 'input',
-        'name': 'project_name',
-        'message': 'Project Name (for subdomain):',
-        'default': repo_name.lower()
-    }
-
-    name_of_project = prompt(name_of_project_question)['project_name'].lower()
+    name_of_project = name_of_project_prompt(repo_name, username, retrodeep_access_token)
 
     # Ensure './' is included as the first option to represent the root directory
     directories_with_root = ['./'] + \
@@ -408,6 +390,7 @@ def delete_project(args):
     retrodeep_access_token = credentials['retrodeep_access_token']
 
     project_name = args.project_name
+    print(args.project_name)
     if not project_name:
         print("Error: Project name is required.")
         parser_deleteProjects.print_help()
@@ -418,7 +401,7 @@ def delete_project(args):
                 f"You're about to remove the project: \033[1m{project_name}\033[0m")
             print("This would permanently delete all its deployments and dependencies")
             
-            if confirm_action(f"> {Style.RED}\033[1mAre you sure?\033[0m{Style.RESET} {Style.GREY}Y/n{Style.RESET}"):
+            if confirm_action(f"> {Style.RED}\033[1mAre you sure?\033[0m{Style.RESET}"):
                 delete_project_request(
                     username, args.project_name, retrodeep_access_token)
             else:
@@ -491,9 +474,10 @@ def confirm_action(prompt):
 
 
 def get_user_projects(username, retrodeep_access_token, email_address):
-    url = f"{API_BASE_URL}/users/{username}/projects"
+    url = f"{API_BASE_URL}/projects"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
-    response = requests.get(url, headers=headers)
+    data = {'username': username}
+    response = requests.get(url, json=data, headers=headers)
 
     if response.status_code == 200:
         projects_data = response.json()
@@ -518,9 +502,10 @@ def get_user_projects(username, retrodeep_access_token, email_address):
 
 
 def check_project_exists(username, project_name, retrodeep_access_token):
-    url = f"{API_BASE_URL}/users/{username}/projects/{project_name}"
+    url = f"{API_BASE_URL}/projects/{project_name}"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
-    response = requests.get(url, headers=headers)
+    data = {'username': username}
+    response = requests.get(url, json=data, headers=headers)
 
     if response.status_code == 200:
         return True
@@ -532,11 +517,11 @@ def check_project_exists(username, project_name, retrodeep_access_token):
 
 
 def add_new_project(username, email, project_name, domain_name, repo_name, retrodeep_access_token):
-    url = f"{API_BASE_URL}/users/{username}/projects"
+    url = f"{API_BASE_URL}/projects"
     headers = {'Content-Type': 'application/json',
                'Authorization': f'Bearer {retrodeep_access_token}'}
     data = {'project_name': project_name,
-            'email': email, 'repo_name': repo_name, 'domain_name': domain_name}
+            'email': email, 'repo_name': repo_name, 'domain_name': domain_name, username: 'username'}
 
     if repo_name:
         data['repo_name'] = repo_name
@@ -559,10 +544,10 @@ def add_new_project(username, email, project_name, domain_name, repo_name, retro
 
 
 def delete_project_request(username, project_name, retrodeep_access_token):
-    url = f"{API_BASE_URL}/users/{username}/projects/{project_name}"
+    url = f"{API_BASE_URL}/projects/{project_name}"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
-
-    response = requests.delete(url, headers=headers)
+    data ={username: 'username'}
+    response = requests.delete(url, json=data, headers=headers)
 
     if response.status_code == 200:
         print(f"Bravo! Deleted 1 project \033[1m{project_name}\033[0m")
@@ -673,6 +658,45 @@ def get_repo_directories(token, org_name, repo_name, path="."):
             directories.extend(get_repo_directories(
                 token, org_name, repo_name, subdir_path))
     return directories
+
+def name_of_project_prompt_repo(repo_name, username, retrodeep_access_token):
+
+    while True:
+        # Prompt to choose user project
+        name_of_project_question = {
+            'type': 'input',
+            'name': 'project_name',
+            'message': 'Project Name (for subdomain):',
+            'default': repo_name.lower()
+        }
+
+        name_of_project = prompt(name_of_project_question)['project_name'].lower()
+
+        # Check if project exists
+        if check_project_exists(username, name_of_project, retrodeep_access_token):
+            print(f"> Project \033[1m{name_of_project}\033[0m already exists, please choose a new name.")
+        else:
+            break
+
+    return name_of_project
+
+def name_of_project_prompt(username, retrodeep_access_token):
+
+    while True:
+        project_name_question = {
+        'type': 'input',
+        'name': 'project_name',
+        'message': 'Enter the project name (for subdomain):'
+    }
+        project_name = prompt(project_name_question)['project_name']
+
+        # Check if project exists
+        if check_project_exists(username, project_name, retrodeep_access_token):
+            print(f"> Project \033[1m{project_name}\033[0m already exists, please choose a new name.")
+        else:
+            break
+
+    return project_name
 
 
 def is_domain_up(url):
