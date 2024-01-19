@@ -23,7 +23,7 @@ import itertools
 import subprocess
 import re
 import signal
-import sys
+import sys, traceback
 import waitress
 import secrets
 import uuid
@@ -224,23 +224,29 @@ def init(args):
         token, username, email, retrodeep_access_token = initiate_github_oauth()
         manage_user_session(username, token, email)
 
-    print(f"Hi {username}!")
-    deploy_choices = [
-        {
-            'type': 'list',
-            'name': 'source',
-            'message': 'Choose a deployment source:',
-            'choices': ['Local Directory', 'GitHub Repository']
-        }
-    ]
-    answers = prompt(deploy_choices)
+    try:
+        print(f"Hi {username}!")
+        deploy_choices = [
+            {
+                'type': 'list',
+                'name': 'source',
+                'message': 'Choose a deployment source:',
+                'choices': ['Local Directory', 'GitHub Repository']
+            }
+        ]
+        answers = prompt(deploy_choices)
 
-    if answers['source'] == 'Local Directory':
-        # Continue with the deployment process
-        deploy_from_local(username, email, retrodeep_access_token)
-    else:
-        # Continue with the repo deployment process
-        deploy_from_repo(token, username, email, retrodeep_access_token)
+        if answers['source'] == 'Local Directory':
+            # Continue with the deployment process
+            deploy_from_local(username, email, retrodeep_access_token)
+        else:
+            # Continue with the repo deployment process
+            deploy_from_repo(token, username, email, retrodeep_access_token)
+
+    except SystemExit as e:
+        sys.exit(e)
+    except:
+        raise SystemExit()
 
 def deploy_using_flags(args):
     credentials = get_stored_credentials()
@@ -390,7 +396,6 @@ def delete_project(args):
     retrodeep_access_token = credentials['retrodeep_access_token']
 
     project_name = args.project_name
-    print(args.project_name)
     if not project_name:
         print("Error: Project name is required.")
         parser_deleteProjects.print_help()
@@ -546,7 +551,8 @@ def add_new_project(username, email, project_name, domain_name, repo_name, retro
 def delete_project_request(username, project_name, retrodeep_access_token):
     url = f"{API_BASE_URL}/projects/{project_name}"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
-    data ={username: 'username'}
+    data = {'username': username}
+
     response = requests.delete(url, json=data, headers=headers)
 
     if response.status_code == 200:
@@ -801,11 +807,9 @@ def upload_file(zip_file_path, project_name, username, directory, retrodeep_acce
         return {"error": f"Request failed: {str(e)}"}
 
 
-def Exit_gracefully(signal, frame):
-    print('I have encountered the signal KILL.')
-    print('CTRL+C was pressed.  Do anything here before the process exists')
+def Exit_gracefully(signum, frame):
     # exit(1)
-    sys.exit(0)
+    sys.exit(1)
 
 
 if __name__ == "__main__":
