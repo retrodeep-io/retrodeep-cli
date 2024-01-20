@@ -90,10 +90,10 @@ def deploy_from_local(username, email, retrodeep_access_token):
             # Check for the existence of .html file
             if glob.glob(os.path.join(absolute_path, '*.html')):
                 print(
-                    f"You are about to deploy from the directory: \033[1m{absolute_path}\033[0m")
+                    f"> You are about to deploy from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
                 break
             else:
-                print("There is no index.html file in the provided path.")
+                print("> There is no index.html file in the provided path.")
                 choice_question = {
                     'type': 'list',
                     'name': 'choice',
@@ -105,11 +105,11 @@ def deploy_from_local(username, email, retrodeep_access_token):
                     print("Exiting the application.")
                     return
         else:
-            print("Invalid directory. Please enter a valid directory path.")
+            print("> Invalid directory. Please enter a valid directory path.")
 
     zip_file_path = compress_directory(absolute_path, project_name)
 
-    with yaspin(text="\033[1mInitializing Deployment...\033[0m", color="cyan") as spinner:
+    with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
         # Fork the selected repository to the organization
         workflow = upload_file(zip_file_path, project_name, username, "./", retrodeep_access_token)
         os.remove(zip_file_path)
@@ -121,13 +121,13 @@ def deploy_from_local(username, email, retrodeep_access_token):
 
     # Check if workflow completed successfully
     if workflow.get('conclusion') == "success":
-        with yaspin(text="\033[1mFinalizing Setup...\033[0m", color="cyan") as spinner:
+        with yaspin(text=f"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
             while not is_domain_up(workflow.get('url2')):
                 time.sleep(0.200)
             spinner.ok("✔")
 
         duration = round(time.time() - start_time, 2)
-        with yaspin(text=f"\033[1mDeploy Succeeded [{duration}s]\033[0m", color="cyan") as spinner:
+        with yaspin(text=f"{Style.BOLD}Deploy Succeeded [{duration}s]{Style.RESET}", color="cyan") as spinner:
             spinner.ok("✔")
         print(
             f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
@@ -136,10 +136,6 @@ def deploy_from_local(username, email, retrodeep_access_token):
                     workflow.get('full_repo_name'), retrodeep_access_token)
     else:
         print("\nDeployment failed.")
-
-    add_new_project(username, email, project_name, workflow.get('domain_name'),
-                    workflow.get('full_repo_name'), retrodeep_access_token)
-
     sys.exit(0)
 
 
@@ -186,7 +182,7 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     dir_answer = prompt(questions)
     directory = dir_answer['directory']
 
-    with yaspin(text="\033[1mInitializing Deployment...\033[0m", color="cyan") as spinner:
+    with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
         # Fork the selected repository to the organization
         workflow = deploy(token, repo_name, name_of_project,
                           directory, username, retrodeep_access_token)
@@ -197,13 +193,13 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
 
     # Check if workflow completed successfully
     if workflow.get('conclusion') == "success":
-        with yaspin(text="\033[1mFinalizing Setup...\033[0m", color="cyan") as spinner:
+        with yaspin(text=F"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
             while not is_domain_up(workflow.get('url2')):
                 time.sleep(0.200)
             spinner.ok("✔")
 
         duration = round(time.time() - start_time, 2)
-        with yaspin(text=f"\033[1mDeploy Succeeded [{duration}s]\033[0m", color="cyan") as spinner:
+        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
             spinner.ok("✔")
             # print(f"\nDeploy Succeeded [{duration}s]")
         print(
@@ -211,7 +207,6 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         print("> 🎉 Congratulations! Your project is now up and running.")
         add_new_project(username, email, name_of_project, workflow.get('domain_name'),
                     workflow.get('forked_repo_name'), retrodeep_access_token)
-
     else:
         print("\nDeployment failed.")
 
@@ -277,13 +272,13 @@ def deploy_using_flags(args):
     if args.dir and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
         # Check for the existence of .html file
         if glob.glob(os.path.join(absolute_path, '*.html')):
-            print(f"You are about to deploy the project \033[1m{args.name}\033[0m from the directory: \033[1m{absolute_path}\033[0m")
+            print(f"You are about to deploy the project {Style.BOLD}{args.name}{Style.RESET} from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
             
-            if confirm_action(f"> {Style.CYAN}\033[1mDo you want to continue? \033[0m{Style.CYAN}"):
+            if confirm_action(f"> {Style.CYAN}{Style.BOLD}Do you want to continue?{Style.RESET}"):
 
                 zip_file_path = compress_directory(absolute_path, args.name)
 
-                with yaspin(text="\033[1mInitializing Deployment...\033[0m", color="cyan") as spinner:
+                with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
                     # Fork the selected repository to the organization
                     workflow = upload_file(zip_file_path, args.name, username, "./", retrodeep_access_token)
                     os.remove(zip_file_path)
@@ -295,13 +290,13 @@ def deploy_using_flags(args):
 
                 # Check if workflow completed successfully
                 if workflow.get('conclusion') == "success":
-                    with yaspin(text="\033[1mFinalizing Setup...\033[0m", color="cyan") as spinner:
+                    with yaspin(text=f"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
                         while not is_domain_up(workflow.get('url2')):
                             time.sleep(0.200)
                         spinner.ok("✔")
 
                     duration = round(time.time() - start_time, 2)
-                    with yaspin(text=f"\033[1mDeploy Succeeded [{duration}s]\033[0m", color="cyan") as spinner:
+                    with yaspin(text=f"{Style.BOLD}Deploy Succeeded{Style.RESET} {Style.GREY}[{duration}s]\033[0m", color="cyan") as spinner:
                         spinner.ok("✔")
                     print(
                         f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
@@ -341,7 +336,7 @@ def dev_with_flags(args):
             port = int(args.port)
         
         with MyTCPServer(("", port), QuietHTTPRequestHandler) as httpd:
-            print(f"> Hooray! Dev ready at \033[1m{Style.UNDERLINE}http://localhost:{port}{Style.RESET}\033[0m")
+            print(f"> Hooray! Dev ready at {Style.BOLD}{Style.UNDERLINE}http://localhost:{port}{Style.RESET}\033[0m")
 
             webbrowser.open_new_tab(f"http://localhost:{port}")           
             try:
@@ -413,16 +408,16 @@ def login(args):
     credentials = get_stored_credentials()
     if credentials:
         print(
-            f"> You are currently logged in to Retrodeep with the email address \033[1m{credentials['email_address']}\033[0m")
+            f"> You are currently logged in to Retrodeep with the email address {Style.BOLD}{credentials['email_address']}{Style.RESET}")
         sys.exit(1)
     else:
         print("> No Credentials found. You are not currently logged in to retrodeep.")
         print("> Authenticate with GitHub to proceed with Retrodeep:")
-        with yaspin(text="\033[1mAuthenticating...\033[0m", color="cyan") as spinner:
+        with yaspin(text=f"{Style.BOLD}Authenticating...{Style.RESET}", color="cyan") as spinner:
              # Initiate GitHub OAuth process and retrieve token and email
             token, username, email, retrodeep_access_token = initiate_github_oauth()
             if token:
-                spinner.text = "\033[1mAuthentication completed\033[0m"
+                spinner.text = f"{Style.BOLD}Authentication completed{Style.RESET}"
                 spinner.ok("✔")
         # print("Authentication completed.")
         if username and email and token and retrodeep_access_token:
@@ -441,7 +436,7 @@ def login_for_workflow():
         print("> No Credentials found. You are not currently logged in to Retrodeep.")
         print("> Authenticate with GitHub to proceed with Retrodeep:")
 
-        with yaspin(text="\033[1mAuthenticating...\033[0m", color="cyan") as spinner:
+        with yaspin(text=f"{Style.BOLD}Authenticating...{Style.RESET}", color="cyan") as spinner:
              # Initiate GitHub OAuth process and retrieve token and email
             token, username, email, retrodeep_access_token = initiate_github_oauth()
             if token:
@@ -460,7 +455,7 @@ def login_for_workflow():
 
 def login_message(email):
     print(
-        f"> You have successfully authenticated with GitHub as \033[1m{email}\033[0m")
+        f"> You have successfully authenticated with GitHub as {Style.BOLD}{email}{Style.RESET}")
     print(
         f"Welcome aboard! Enjoy your journey with Retrodeep! 🚀")
 
@@ -489,10 +484,10 @@ def delete_project(args):
     else:
         if check_project_exists(username, project_name, retrodeep_access_token):
             print(
-                f"You're about to remove the project: \033[1m{project_name}\033[0m")
+                f"You're about to remove the project: {Style.BOLD}{project_name}{Style.RESET}")
             print("This would permanently delete all its deployments and dependencies")
             
-            if confirm_action(f"> {Style.RED}\033[1mAre you sure?\033[0m{Style.RESET}"):
+            if confirm_action(f"> {Style.RED}{Style.BOLD}Are you sure?{Style.RESET}"):
                 delete_project_request(
                     username, args.project_name, retrodeep_access_token)
             else:
@@ -500,7 +495,7 @@ def delete_project(args):
                 sys.exit(1)
         else:
             print(
-                f'> There are no deployments or projects matching \033[1m{project_name}\033[0m.')
+                f'> There are no deployments or projects matching {Style.BOLD}{project_name}{Style.RESET}.')
 
 
 def whoami(args):
@@ -509,9 +504,9 @@ def whoami(args):
     username = credentials['username']
     email = credentials['email_address']
 
-    print(f"> \033[1m{username}\033[0m")
+    print(f"> {Style.BOLD}{username}{Style.RESET}")
     print(
-        f"> You are currently authenticated using the email address \033[1m{email}\033[0m")
+        f"> You are currently authenticated using the email address {Style.BOLD}{email}{Style.RESET}")
 
 
 def get_stored_credentials():
@@ -579,13 +574,13 @@ def get_user_projects(username, retrodeep_access_token, email_address):
 
         projects_list = [
             {
-                '\033[1mProject Name\033[0m': f" \033[1m{project['project_name']}\033[0m",
-                '\033[1mDeployment URL\033[0m': f"https://{project['domain_name']}.retrodeep.app",
-                '\033[1mLast Updated\033[0m': format_days_since(project['updated_at'])
+                f'{Style.BOLD}Project Name{Style.RESET}': f" {Style.BOLD}{project['project_name']}{Style.RESET}",
+                f'{Style.BOLD}Deployment URL{Style.RESET}': f"https://{project['domain_name']}.retrodeep.app",
+                f'{Style.BOLD}Last Updated{Style.RESET}': format_days_since(project['updated_at'])
             }
             for project in projects_data
         ]
-        print(f"> Projects for user \033[1m{email_address}\033[0m\n")
+        print(f"> Projects for user {Style.BOLD}{email_address}{Style.RESET}\n")
         print(tabulate(projects_list, headers='keys', tablefmt='plain'))
     else:
         print(
@@ -642,7 +637,7 @@ def delete_project_request(username, project_name, retrodeep_access_token):
     response = requests.delete(url, json=data, headers=headers)
 
     if response.status_code == 200:
-        print(f"Bravo! Deleted 1 project \033[1m{project_name}\033[0m")
+        print(f"Bravo! Deleted 1 project {Style.BOLD}{project_name}{Style.RESET}")
     else:
         print(
             f"Failed to delete project. Status Code: {response.status_code}")
@@ -766,7 +761,7 @@ def name_of_project_prompt_repo(repo_name, username, retrodeep_access_token):
 
         # Check if project exists
         if check_project_exists(username, name_of_project, retrodeep_access_token):
-            print(f"> Project \033[1m{name_of_project}\033[0m already exists, please choose a new name.")
+            print(f"> Project {Style.BOLD}{name_of_project}{Style.RESET} already exists, please choose a new name.")
         else:
             break
 
@@ -784,7 +779,7 @@ def name_of_project_prompt(username, retrodeep_access_token):
 
         # Check if project exists
         if check_project_exists(username, project_name, retrodeep_access_token):
-            print(f"> Project \033[1m{project_name}\033[0m already exists, please choose a new name.")
+            print(f"> Project {Style.BOLD}{project_name}{Style.RESET} already exists, please choose a new name.")
         else:
             break
 
