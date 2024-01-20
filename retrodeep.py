@@ -30,6 +30,8 @@ import uuid
 from tabulate import tabulate
 from yaspin import yaspin
 import glob
+import http.server
+import socketserver
 
 from cryptography.fernet import Fernet
 
@@ -48,10 +50,18 @@ class Style:
     BOLD = '\033[1m'
     DIM = '\033[2m'
     CYAN = '\033[36m'
+    UNDERLINE = '\033[4m'
 
 
 # Set to store previously generated codes to ensure uniqueness
 generated_codes = set()
+
+class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
+class MyTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True 
 
 
 # Determine the configuration directory
@@ -255,7 +265,6 @@ def deploy_using_flags(args):
         username = credentials['username']
         email = credentials['email_address']
         retrodeep_access_token = credentials['retrodeep_access_token']
-
     else:
         # If no credentials, initiate OAuth
         print("> No existing Retrodeep credentials detected. Please authenticate")
@@ -309,6 +318,83 @@ def deploy_using_flags(args):
         print("Invalid directory. Please enter a valid directory path.")
 
     sys.exit(0)
+
+def dev_with_flags(args):
+    credentials = get_stored_credentials()
+    if credentials:
+        token = credentials['access_token']
+        username = credentials['username']
+        email = credentials['email_address']
+        retrodeep_access_token = credentials['retrodeep_access_token']
+    else:
+        # If no credentials, initiate OAuth
+        print("> No existing Retrodeep credentials detected. Please authenticate")
+        print("> Authenticate with GitHub to proceed with Retrodeep:")
+        token, username, email, retrodeep_access_token = initiate_github_oauth()
+        manage_user_session(username, token, email)
+        port = 3000
+
+    absolute_path = os.path.abspath(args.dir)
+    
+    if args.dir and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
+        if args.port:
+            port = int(args.port)
+        
+        with MyTCPServer(("", port), QuietHTTPRequestHandler) as httpd:
+            print(f"> Hooray! Dev ready at \033[1m{Style.UNDERLINE}http://localhost:{port}{Style.RESET}\033[0m")
+
+            webbrowser.open_new_tab(f"http://localhost:{port}")           
+            try:
+                httpd.serve_forever()
+            except KeyboardInterrupt:
+                httpd.server_close()
+                sys.exit(0)
+            except SystemExit as e:
+                httpd.server_close()
+                sys.exit(e)
+            except:
+                httpd.server_close()
+                raise SystemExit()
+    else:
+        print("Invalid directory. Please enter a valid directory path.")
+
+def dev(args):
+    credentials = get_stored_credentials()
+    if credentials:
+        token = credentials['access_token']
+        username = credentials['username']
+        email = credentials['email_address']
+        retrodeep_access_token = credentials['retrodeep_access_token']
+    else:
+        # If no credentials, initiate OAuth
+        print("> No existing Retrodeep credentials detected. Please authenticate")
+        print("> Authenticate with GitHub to proceed with Retrodeep:")
+        token, username, email, retrodeep_access_token = initiate_github_oauth()
+        manage_user_session(username, token, email)
+        port = 3000
+
+    port_question = {
+            'type': 'input',
+            'name': 'directory',
+            'message': 'Enter the port you woould like to listen:',
+            'default': '.'
+        }
+    
+    directory = prompt(port_question)['directory']
+
+    absolute_path = os.path.abspath(args.dir)
+    if args.dir and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
+        if args.port:
+            port = int(args.port)
+        # Handler and Server
+        Handler = http.server.SimpleHTTPRequestHandler
+        with socketserver.TCPServer(("", port), Handler) as httpd:
+            print(f"Serving directory '{args.dir}' at http://localhost:{port}")
+            webbrowser.open_new_tab(f"http://localhost:{port}")
+            httpd.serve_forever()
+    else:
+        print("Invalid directory. Please enter a valid directory path.")
+
 
 def logout(args):
     retrodeep_dir = os.path.join(os.path.expanduser('~'), '.retrodeep')
@@ -821,10 +907,16 @@ if __name__ == "__main__":
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     # Deploy command
-    parser_deploy = subparsers.add_parser("deploy", help="Deploy your project locally or from a git repository")    
+    parser_deploy = subparsers.add_parser("deploy", help="Deploy your project from a local directory or from a git repository")    
     parser_deploy.add_argument("-n", "--name", help="Name of the project")
     parser_deploy.add_argument("-d", "--dir", help="Directory path for deployment")
     parser_deploy.set_defaults(func=init)
+
+    # Dev command
+    parser_dev = subparsers.add_parser("dev", help="Test your project locally on your local machine")    
+    parser_dev.add_argument("-p", "--port", help="Port to listen on")
+    parser_dev.add_argument("-d", "--dir", help="Directory path for deployment")
+    parser_dev.set_defaults(func=dev)
 
     # Login command
     parser_login = subparsers.add_parser(
@@ -856,6 +948,12 @@ if __name__ == "__main__":
     parser_whoami.set_defaults(func=whoami)
 
     args = parser.parse_args()
+
+    if args.command == "dev":
+        if args.port and args.dir:
+            dev_with_flags(args)
+        else:
+            dev(args)
 
     if args.command == "deploy":
         if args.name and args.dir:
