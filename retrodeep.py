@@ -40,7 +40,7 @@ app = Flask(__name__)
 API_BASE_URL = "https://api.retrodeep.com/v1"
 SCM_BASE_URL = "https://scm.retrodeep.com"
 AUTH_BASE_URL = "https://auth.retrodeep.com"
-
+__version__ = "1.0.0"
 
 # ANSI escape codes for colors and styles
 class Style:
@@ -51,6 +51,19 @@ class Style:
     DIM = '\033[2m'
     CYAN = '\033[36m'
     UNDERLINE = '\033[4m'
+
+class CustomFormatter(argparse.HelpFormatter):
+    def _format_usage(self, usage, actions, groups, prefix):
+        if prefix is None:
+            prefix = 'usage: '
+        # Return your custom usage string
+        return f"{prefix}retrodeep [options] [command]\n\n"
+    
+    def _format_action(self, action):
+        parts = super()._format_action(action).split('\n')
+        parts_filtered = [part for part in parts if not part.strip().startswith('{')]
+        return '\n'.join(parts_filtered)
+
 
 
 # Set to store previously generated codes to ensure uniqueness
@@ -451,6 +464,10 @@ def login_for_workflow():
         else:
             print("> Failed to authenticate or create user.")
             sys.exit(1)
+
+def show_help(parser):
+    parser.print_help()
+    sys.exit()
 
 
 def login_message(email):
@@ -886,6 +903,8 @@ def upload_file(zip_file_path, project_name, username, directory, retrodeep_acce
 
     except requests.exceptions.RequestException as e:
         return {"error": f"Request failed: {str(e)}"}
+    
+
 
 
 def Exit_gracefully(signum, frame):
@@ -894,12 +913,18 @@ def Exit_gracefully(signum, frame):
 
 
 if __name__ == "__main__":
-    print(f"{Style.DIM}{Style.GREY}Retrodeep CLI 0.0.1-beta.1{Style.RESET}")
+    print(f"{Style.DIM}{Style.GREY}Retrodeep CLI {__version__}{Style.RESET}")
 
     signal.signal(signal.SIGINT, Exit_gracefully)
 
-    parser = argparse.ArgumentParser(description="Retrodeep CLI")
-    subparsers = parser.add_subparsers(dest="command", help="Commands")
+    # parser = argparse.ArgumentParser(prog='retrodeep')
+    parser = argparse.ArgumentParser(prog='retrodeep', 
+                                     description='Deploy. Build. Scale',
+                                     formatter_class=CustomFormatter)
+    
+    subparsers = parser.add_subparsers(title="Commands", dest="command", help="")
+    parser.add_argument('-v', '--version', action='version', version=f"{__version__}")
+
 
     # Deploy command
     parser_deploy = subparsers.add_parser("deploy", help="Deploy your project from a local directory or from a git repository")    
@@ -931,7 +956,6 @@ if __name__ == "__main__":
     # delete deployment command
     parser_deleteProjects = subparsers.add_parser(
         "rm", help="Delete/Remove a project on Retrodeep")
-    # Add an argument for project name
     parser_deleteProjects.add_argument(
         "project_name",
         help="Name of the project to delete")
@@ -941,6 +965,10 @@ if __name__ == "__main__":
     parser_whoami = subparsers.add_parser(
         "whoami", help="Shows the currently logged in user")
     parser_whoami.set_defaults(func=whoami)
+
+    # help
+    parser_help = subparsers.add_parser('help', help='Show help')
+    parser_help.set_defaults(func=lambda args: show_help(parser))
 
     args = parser.parse_args()
 
