@@ -171,12 +171,11 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     else:
         print("You do not have any repositories")
         sys.exit(1)
-        pass
 
     # Fetch the directories from the repository
     directories = get_repo_directories(token, username, repo_name)
 
-    name_of_project = name_of_project_prompt(repo_name, username, retrodeep_access_token)
+    name_of_project = name_of_project_prompt_repo(repo_name, username, retrodeep_access_token)
 
     # Ensure './' is included as the first option to represent the root directory
     directories_with_root = ['./'] + \
@@ -192,8 +191,11 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         }
     ]
 
+
     dir_answer = prompt(questions)
     directory = dir_answer['directory']
+
+    start_time = time.time()
 
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
         # Fork the selected repository to the organization
@@ -201,8 +203,6 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
                           directory, username, retrodeep_access_token)
         if workflow.get('status') == 'completed':
             spinner.ok("✔")
-
-    start_time = time.time()
 
     # Check if workflow completed successfully
     if workflow.get('conclusion') == "success":
@@ -764,6 +764,8 @@ def get_repo_directories(token, org_name, repo_name, path="."):
     return directories
 
 def name_of_project_prompt_repo(repo_name, username, retrodeep_access_token):
+
+    repo_name = repo_name.replace(".", "-")
 
     while True:
         # Prompt to choose user project
