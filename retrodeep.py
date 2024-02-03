@@ -39,6 +39,7 @@ app = Flask(__name__)
 
 API_BASE_URL = "https://api.retrodeep.com/v1"
 SCM_BASE_URL = "https://scm.retrodeep.com"
+DEPLOY_BASE_URL = "https://deploy.retrodeep.com/v1"
 AUTH_BASE_URL = "https://auth.retrodeep.com"
 __version__ = "1.0.0"
 
@@ -75,6 +76,9 @@ class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 class MyTCPServer(socketserver.TCPServer):
     allow_reuse_address = True 
+
+def signal_handler(signal_received, frame):
+    sys.exit(0)
 
 
 # Determine the configuration directory
@@ -124,7 +128,7 @@ def deploy_from_local(username, email, retrodeep_access_token):
 
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
         # Fork the selected repository to the organization
-        workflow = upload_file(zip_file_path, project_name, username, "./", retrodeep_access_token)
+        workflow = deploy_local(zip_file_path, email, project_name, username, "./", retrodeep_access_token)
         os.remove(zip_file_path)
 
         if workflow.get('status') == 'completed':
@@ -133,22 +137,17 @@ def deploy_from_local(username, email, retrodeep_access_token):
     start_time = time.time()
 
     # Check if workflow completed successfully
-    if workflow.get('conclusion') == "success":
-        with yaspin(text=f"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
-            while not is_domain_up(workflow.get('url2')):
-                time.sleep(0.200)
-            spinner.ok("✔")
+    with yaspin(text=f"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
+        while not is_domain_up(workflow.get('url2')):
+            time.sleep(0.200)
+        spinner.ok("✔")
 
-        duration = round(time.time() - start_time, 2)
-        with yaspin(text=f"{Style.BOLD}Deploy Succeeded [{duration}s]{Style.RESET}", color="cyan") as spinner:
-            spinner.ok("✔")
-        print(
-            f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
-        print("> 🎉 Congratulations! Your project is now up and running.")
-        add_new_project(username, email, project_name, workflow.get('domain_name'),
-                    workflow.get('full_repo_name'), retrodeep_access_token)
-    else:
-        print("\nDeployment failed.")
+    duration = round(time.time() - start_time, 2)
+    with yaspin(text=f"{Style.BOLD}Deploy Succeeded [{duration}s]{Style.RESET}", color="cyan") as spinner:
+        spinner.ok("✔")
+    print(
+        f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
+    print("> 🎉 Congratulations! Your project is now up and running.")
     sys.exit(0)
 
 
@@ -191,7 +190,6 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         }
     ]
 
-
     dir_answer = prompt(questions)
     directory = dir_answer['directory']
 
@@ -199,29 +197,22 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
 
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
         # Fork the selected repository to the organization
-        workflow = deploy(token, repo_name, name_of_project,
+        workflow = deploy(email, repo_name, name_of_project,
                           directory, username, retrodeep_access_token)
         if workflow.get('status') == 'completed':
             spinner.ok("✔")
 
-    # Check if workflow completed successfully
-    if workflow.get('conclusion') == "success":
-        with yaspin(text=F"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
-            while not is_domain_up(workflow.get('url2')):
-                time.sleep(0.200)
-            spinner.ok("✔")
+    with yaspin(text=F"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
+        while not is_domain_up(workflow.get('url2')):
+            time.sleep(0.2)
+        spinner.ok("✔")
 
-        duration = round(time.time() - start_time, 2)
-        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
-            spinner.ok("✔")
-            # print(f"\nDeploy Succeeded [{duration}s]")
-        print(
-            f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
-        print("> 🎉 Congratulations! Your project is now up and running.")
-        add_new_project(username, email, name_of_project, workflow.get('domain_name'),
-                    workflow.get('forked_repo_name'), retrodeep_access_token)
-    else:
-        print("\nDeployment failed.")
+    duration = round(time.time() - start_time, 2)
+    with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
+        spinner.ok("✔")
+    print(
+        f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
+    print("> 🎉 Congratulations! Your project is now up and running.")
 
     sys.exit(0)
 
@@ -293,7 +284,7 @@ def deploy_using_flags(args):
 
                 with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
                     # Fork the selected repository to the organization
-                    workflow = upload_file(zip_file_path, args.name, username, "./", retrodeep_access_token)
+                    workflow = upload_file(zip_file_path, email, args.name, username, "./", retrodeep_access_token)
                     os.remove(zip_file_path)
 
                     if workflow.get('status') == 'completed':
@@ -316,9 +307,6 @@ def deploy_using_flags(args):
                     print("> 🎉 Congratulations! Your project is now up and running.")
                 else:
                     print("\nDeployment failed.")
-                
-                add_new_project(username, email, args.name, workflow.get('domain_name'),
-                    workflow.get('full_repo_name'), retrodeep_access_token)
             else:
                 print("> Operation canceled")
                 sys.exit(1)
@@ -326,45 +314,6 @@ def deploy_using_flags(args):
         print("Invalid directory. Please enter a valid directory path.")
 
     sys.exit(0)
-
-def dev_with_flags(args):
-    credentials = get_stored_credentials()
-    if credentials:
-        token = credentials['access_token']
-        username = credentials['username']
-        email = credentials['email_address']
-        retrodeep_access_token = credentials['retrodeep_access_token']
-    else:
-        # If no credentials, initiate OAuth
-        print("> No existing Retrodeep credentials detected. Please authenticate")
-        print("> Authenticate with GitHub to proceed with Retrodeep:")
-        token, username, email, retrodeep_access_token = initiate_github_oauth()
-        manage_user_session(username, token, email)
-        port = 3000
-
-    absolute_path = os.path.abspath(args.dir)
-    
-    if args.dir and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
-        if args.port:
-            port = int(args.port)
-        
-        with MyTCPServer(("", port), QuietHTTPRequestHandler) as httpd:
-            print(f"> Hooray! Dev ready at {Style.BOLD}{Style.UNDERLINE}http://localhost:{port}{Style.RESET}\033[0m")
-
-            webbrowser.open_new_tab(f"http://localhost:{port}")           
-            try:
-                httpd.serve_forever()
-            except KeyboardInterrupt:
-                httpd.server_close()
-                sys.exit(0)
-            except SystemExit as e:
-                httpd.server_close()
-                sys.exit(e)
-            except:
-                httpd.server_close()
-                raise SystemExit()
-    else:
-        print("Invalid directory. Please enter a valid directory path.")
 
 def dev(args):
     credentials = get_stored_credentials()
@@ -379,30 +328,49 @@ def dev(args):
         print("> Authenticate with GitHub to proceed with Retrodeep:")
         token, username, email, retrodeep_access_token = initiate_github_oauth()
         manage_user_session(username, token, email)
+
+    if not args.port:
         port = 3000
-
-    port_question = {
-            'type': 'input',
-            'name': 'directory',
-            'message': 'Enter the port you woould like to listen:',
-            'default': '.'
-        }
-    
-    directory = prompt(port_question)['directory']
-
-    absolute_path = os.path.abspath(args.dir)
-    if args.dir and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
-        if args.port:
-            port = int(args.port)
-        # Handler and Server
-        Handler = http.server.SimpleHTTPRequestHandler
-        with socketserver.TCPServer(("", port), Handler) as httpd:
-            print(f"Serving directory '{args.dir}' at http://localhost:{port}")
-            webbrowser.open_new_tab(f"http://localhost:{port}")
-            httpd.serve_forever()
     else:
-        print("Invalid directory. Please enter a valid directory path.")
+        port = int(args.port)
 
+    if not args.dir:
+        dir = "."
+    else:
+        dir = args.dir
+
+    absolute_path = os.path.abspath(dir)
+
+    if not os.path.exists(absolute_path):
+        print(f"> The specified directory {Style.BOLD}{dir}{Style.RESET} does not exist.")
+        sys.exit(1)
+    
+    os.chdir(absolute_path)
+    start_server(port, dir)
+
+def start_server(port, dir_path):
+    while True:
+        try:
+            with MyTCPServer(("", port), QuietHTTPRequestHandler) as httpd:
+                print(f"> Hooray! Dev ready at {Style.BOLD}{Style.UNDERLINE}http://localhost:{port}{Style.RESET}")
+                webbrowser.open_new_tab(f"http://localhost:{port}")
+                httpd.serve_forever()
+            break  
+        except OSError as e:
+            if e.errno in (98, 48): 
+                print(f"> Port {port} is already in use")
+                port += 1  
+            else:
+                raise 
+        except KeyboardInterrupt:
+            httpd.server_close()
+            sys.exit(0)
+        except SystemExit as e:
+            httpd.server_close()
+            sys.exit(e)
+        except:
+            httpd.server_close()
+            raise SystemExit()
 
 def logout(args):
     retrodeep_dir = os.path.join(os.path.expanduser('~'), '.retrodeep')
@@ -575,6 +543,9 @@ def confirm_action(prompt):
     else:
         sys.exit(1)
 
+def generate_domain_name(project_name):
+    return f"{project_name}-{generate_unique_code()}"
+
 
 def get_user_projects(username, retrodeep_access_token, email_address):
     url = f"{API_BASE_URL}/projects"
@@ -660,6 +631,29 @@ def delete_project_request(username, project_name, retrodeep_access_token):
             f"Failed to delete project. Status Code: {response.status_code}")
         print(response.json())
 
+def fetch_and_display_logs(args):
+    credentials = login_for_workflow()
+    
+    username = credentials['username']
+    retrodeep_access_token = credentials['retrodeep_access_token']
+
+    project_name = args.project_name
+    if not project_name:
+        print("Error: Project name is required.")
+        parser_deleteProjects.print_help()
+        sys.exit(1)
+
+    url = f"{API_BASE_URL}/logs/{args.project_name}"
+    headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
+
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        logs = response.json()
+        print(f"> Fetched logs for deployment {project_name} for {Style.BOLD}{project_name}{Style.RESET} ")
+        for log in logs:
+            print(f"{Style.GREY}{log['timestamp']}{Style.RESET}  {log['message']}")
+    else:
+        print(f"Failed to retrieve logs: {response.status_code}")
 
 def initiate_github_oauth():
     session_id = str(uuid.uuid4())
@@ -725,10 +719,10 @@ def list_user_repos(token):
     return [repo.name for repo in user.get_repos()]
 
 
-def deploy(token, repo_name, project_name, directory, username, retrodeep_access_token):
-    url = f"{SCM_BASE_URL}/github/deploy"
+def deploy(email, repo_name, project_name, directory, username, retrodeep_access_token):
+    url = f"{DEPLOY_BASE_URL}/repo/github"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
-    data = {'token': token, 'repo_name': repo_name,
+    data = {'email': email, 'repo_name': repo_name,
             'project_name': project_name, 'directory': directory, 'username': username}
 
     try:
@@ -741,6 +735,28 @@ def deploy(token, repo_name, project_name, directory, username, retrodeep_access
     except Exception as err:
         print(f"An error occurred: {err}")
     return []
+
+def deploy_local(zip_file_path, email, project_name, username, directory, retrodeep_access_token):
+    headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
+    try:
+        with open(zip_file_path, 'rb') as f:
+            files = {'file': (os.path.basename(zip_file_path), f)}
+            data = {
+                'email': email,
+                'project_name': project_name,
+                'username': username,
+                'directory': directory
+            }
+            response = requests.post(
+                f"{DEPLOY_BASE_URL}/local", files=files, data=data, headers=headers)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {"error": f"Failed to upload. Status code: {response.status_code}"}
+
+    except requests.exceptions.RequestException as e:
+        return {"error": f"Request failed: {str(e)}"}
 
 
 def get_repo_directories(token, org_name, repo_name, path="."):
@@ -766,6 +782,9 @@ def get_repo_directories(token, org_name, repo_name, path="."):
 def name_of_project_prompt_repo(repo_name, username, retrodeep_access_token):
 
     repo_name = repo_name.replace(".", "-")
+
+    if check_project_exists(username, repo_name, retrodeep_access_token):
+            repo_name = generate_domain_name(repo_name)
 
     while True:
         # Prompt to choose user project
@@ -885,30 +904,6 @@ def compress_directory(source_dir, output_filename):
     return f"{output_filename}.zip"
 
 
-def upload_file(zip_file_path, project_name, username, directory, retrodeep_access_token):
-    headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
-    try:
-        with open(zip_file_path, 'rb') as f:
-            files = {'file': (os.path.basename(zip_file_path), f)}
-            data = {
-                'project_name': project_name,
-                'username': username,
-                'directory': directory
-            }
-            response = requests.post(
-                f"{SCM_BASE_URL}/upload", files=files, data=data, headers=headers)
-
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {"error": f"Failed to upload. Status code: {response.status_code}"}
-
-    except requests.exceptions.RequestException as e:
-        return {"error": f"Request failed: {str(e)}"}
-    
-
-
-
 def Exit_gracefully(signum, frame):
     # exit(1)
     sys.exit(1)
@@ -938,7 +933,16 @@ if __name__ == "__main__":
     parser_dev = subparsers.add_parser("dev", help="Test your project locally on your local machine")    
     parser_dev.add_argument("-p", "--port", help="Port to listen on")
     parser_dev.add_argument("-d", "--dir", help="Directory path for deployment")
+
     parser_dev.set_defaults(func=dev)
+
+    # logs deployment command
+    parser_logsProjects = subparsers.add_parser(
+        "logs", help="View the logs of a deployment")
+    parser_logsProjects.add_argument(
+        "project_name",
+        help="")
+    parser_logsProjects.set_defaults(func=fetch_and_display_logs)
 
     # Login command
     parser_login = subparsers.add_parser(
@@ -974,11 +978,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.command == "dev":
-        if args.port and args.dir:
-            dev_with_flags(args)
-        else:
-            dev(args)
+    # if args.command == "dev":
+    #     if args.port and args.dir:
+    #         dev_with_flags(args)
+    #     else:
+    #         dev(args)
 
     if args.command == "deploy":
         if args.name and args.dir:
