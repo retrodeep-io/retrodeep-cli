@@ -124,22 +124,23 @@ def deploy_from_local(username, email, retrodeep_access_token):
         else:
             print("> Invalid directory. Please enter a valid directory path.")
 
+    start_time = time.time()
     zip_file_path = compress_directory(absolute_path, project_name)
-
+    
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
-        # Fork the selected repository to the organization
         workflow = deploy_local(zip_file_path, email, project_name, username, "./", retrodeep_access_token)
         os.remove(zip_file_path)
 
         if workflow.get('status') == 'completed':
             spinner.ok("✔")
-
-    start_time = time.time()
+        else:
+            spinner.ok("x")
+            sys.exit(1)
 
     # Check if workflow completed successfully
     with yaspin(text=f"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
         while not is_domain_up(workflow.get('url2')):
-            time.sleep(0.200)
+            time.sleep(0.2)
         spinner.ok("✔")
 
     duration = round(time.time() - start_time, 2)
@@ -217,7 +218,7 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     sys.exit(0)
 
 
-def init(args):
+def init(debug=False):
     # Check for existing credentials
     credentials = get_stored_credentials()
     if credentials:
@@ -271,48 +272,55 @@ def deploy_using_flags(args):
         token, username, email, retrodeep_access_token = initiate_github_oauth()
         manage_user_session(username, token, email)
 
-    absolute_path = os.path.abspath(args.dir)
+    absolute_path = os.path.abspath(args.directory)
     
-    if args.dir and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
-        # Check for the existence of .html file
-        if glob.glob(os.path.join(absolute_path, '*.html')):
-            print(f"You are about to deploy the project {Style.BOLD}{args.name}{Style.RESET} from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
-            
-            if confirm_action(f"> {Style.CYAN}{Style.BOLD}Do you want to continue?{Style.RESET}"):
+    if not os.path.exists(absolute_path) and os.path.isdir(absolute_path):
+        print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} does not exist.")
+        sys.exit(1)
 
-                zip_file_path = compress_directory(absolute_path, args.name)
+    if not glob.glob(os.path.join(absolute_path, '*.html')):
+        print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} does not exist.")
+        sys.exit(1)
 
-                with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
-                    # Fork the selected repository to the organization
-                    workflow = upload_file(zip_file_path, email, args.name, username, "./", retrodeep_access_token)
-                    os.remove(zip_file_path)
-
-                    if workflow.get('status') == 'completed':
-                        spinner.ok("✔")
-
-                start_time = time.time()
-
-                # Check if workflow completed successfully
-                if workflow.get('conclusion') == "success":
-                    with yaspin(text=f"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
-                        while not is_domain_up(workflow.get('url2')):
-                            time.sleep(0.200)
-                        spinner.ok("✔")
-
-                    duration = round(time.time() - start_time, 2)
-                    with yaspin(text=f"{Style.BOLD}Deploy Succeeded{Style.RESET} {Style.GREY}[{duration}s]\033[0m", color="cyan") as spinner:
-                        spinner.ok("✔")
-                    print(
-                        f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
-                    print("> 🎉 Congratulations! Your project is now up and running.")
-                else:
-                    print("\nDeployment failed.")
-            else:
-                print("> Operation canceled")
-                sys.exit(1)
+    if check_project_exists(username, args.name, retrodeep_access_token):
+        print(f"> Project {Style.BOLD}{args.name}{Style.RESET} already exists.")
+        repo_name = generate_domain_name(args.name)
     else:
-        print("Invalid directory. Please enter a valid directory path.")
+        repo_name = args.name
 
+    print(f"You are about to deploy the project {Style.BOLD}{repo_name}{Style.RESET} from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
+    
+    if not confirm_action(f"> {Style.CYAN}{Style.BOLD}Do you want to continue?{Style.RESET}"):
+        print("> Operation canceled")
+        sys.exit(0)
+
+    start_time = time.time()
+    zip_file_path = compress_directory(absolute_path, args.name)
+    print(zip_file_path)
+
+    with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
+        workflow = deploy_local(zip_file_path, email, repo_name, username, "./", retrodeep_access_token)
+        os.remove(zip_file_path)
+
+        if workflow.get('status') == 'completed':
+            spinner.ok("✔")
+        else:
+            spinner.ok("x")
+            sys.exit(1)
+            
+
+    # Check if workflow completed successfully
+    with yaspin(text=f"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
+        while not is_domain_up(workflow.get('url2')):
+            time.sleep(0.2)
+        spinner.ok("✔")
+
+    duration = round(time.time() - start_time, 2)
+    with yaspin(text=f"{Style.BOLD}Deploy Succeeded [{duration}s]{Style.RESET}", color="cyan") as spinner:
+        spinner.ok("✔")
+    print(
+        f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
+    print("> 🎉 Congratulations! Your project is now up and running.")
     sys.exit(0)
 
 def dev(args):
@@ -334,10 +342,10 @@ def dev(args):
     else:
         port = int(args.port)
 
-    if not args.dir:
+    if not args.directory:
         dir = "."
     else:
-        dir = args.dir
+        dir = args.directory
 
     absolute_path = os.path.abspath(dir)
 
@@ -657,6 +665,7 @@ def fetch_and_display_logs(args):
 
 def initiate_github_oauth():
     session_id = str(uuid.uuid4())
+
     webbrowser.open(
         f"{AUTH_BASE_URL}/login?session_id={session_id}")
 
@@ -737,27 +746,29 @@ def deploy(email, repo_name, project_name, directory, username, retrodeep_access
     return []
 
 def deploy_local(zip_file_path, email, project_name, username, directory, retrodeep_access_token):
+    url = f"{DEPLOY_BASE_URL}/local"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
+    data = {'project_name': project_name, 'username': username, 'directory': directory, 'email': email}
+
     try:
         with open(zip_file_path, 'rb') as f:
             files = {'file': (os.path.basename(zip_file_path), f)}
-            data = {
-                'email': email,
-                'project_name': project_name,
-                'username': username,
-                'directory': directory
-            }
-            response = requests.post(
-                f"{DEPLOY_BASE_URL}/local", files=files, data=data, headers=headers)
+            response = requests.post(url, data=data, files=files, headers=headers)
+            response.raise_for_status()
 
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {"error": f"Failed to upload. Status code: {response.status_code}"}
-
+        return response.json()
     except requests.exceptions.RequestException as e:
-        return {"error": f"Request failed: {str(e)}"}
-
+        # More detailed error handling
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                # Attempt to decode JSON error message
+                error_message = e.response.json()
+            except ValueError:
+                # Fallback if response is not in JSON format
+                error_message = e.response.text
+        else:
+            error_message = str(e)
+        return {"error": f"Request failed: {error_message}"}
 
 def get_repo_directories(token, org_name, repo_name, path="."):
     headers = {
@@ -918,6 +929,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='retrodeep', 
                                      description='Deploy. Build. Scale',
                                      formatter_class=CustomFormatter)
+    # Global flags
+    parser.add_argument('-d', '--debug', action='store_true', help='Enable debug')
     
     subparsers = parser.add_subparsers(title="Commands", dest="command", help="")
     parser.add_argument('-v', '--version', action='version', version=f"{__version__}")
@@ -925,14 +938,14 @@ if __name__ == "__main__":
 
     # Deploy command
     parser_deploy = subparsers.add_parser("deploy", help="Deploy your project from a local directory or from a git repository")    
-    parser_deploy.add_argument("-n", "--name", help="Name of the project")
-    parser_deploy.add_argument("-d", "--dir", help="Directory path for deployment")
-    parser_deploy.set_defaults(func=init)
+    parser_deploy.add_argument("name", help="Name of the project")
+    parser_deploy.add_argument("directory",help="Directory path for deployment")
+    parser_deploy.set_defaults(func=deploy_using_flags)
 
     # Dev command
     parser_dev = subparsers.add_parser("dev", help="Test your project locally on your local machine")    
-    parser_dev.add_argument("-p", "--port", help="Port to listen on")
-    parser_dev.add_argument("-d", "--dir", help="Directory path for deployment")
+    parser_dev.add_argument("port", help="Port to listen on")
+    parser_dev.add_argument("directory", help="Directory path for deployment")
 
     parser_dev.set_defaults(func=dev)
 
@@ -984,13 +997,19 @@ if __name__ == "__main__":
     #     else:
     #         dev(args)
 
-    if args.command == "deploy":
-        if args.name and args.dir:
-            deploy_using_flags(args)
-        else:
-            init(args)
+    # if args.command == "deploy":
+    #     if args.name and args.directory:
+    #         deploy_using_flags(args)
+    #     else:
+    #         init(args)
 
-    if hasattr(args, 'func'):
-        args.func(args)
+    # if hasattr(args, 'func'):
+    #     args.func(args)
+    # else:
+    #     parser.print_help()
+
+    # Default action if no subcommand is provided
+    if not hasattr(args, 'func'):
+        init(debug=args.debug)
     else:
-        parser.print_help()
+        args.func(args)
