@@ -124,11 +124,17 @@ def deploy_from_local(username, email, retrodeep_access_token):
         else:
             print("> Invalid directory. Please enter a valid directory path.")
 
+    framework = check_files_and_framework(absolute_path)
+    
+    if not framework:
+        print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} has no {Style.BOLD}.html{Style.RESET} file.")
+        sys.exit(1)
+
     start_time = time.time()
     zip_file_path = compress_directory(absolute_path, project_name)
     
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
-        workflow = deploy_local(zip_file_path, email, project_name, username, "./", retrodeep_access_token)
+        workflow = deploy_local(framework, zip_file_path, email, project_name, username, "./", retrodeep_access_token)
         os.remove(zip_file_path)
 
         if workflow.get('status') == 'completed':
@@ -302,7 +308,7 @@ def deploy_using_flags(args):
     print(zip_file_path)
 
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
-        workflow = deploy_local(zip_file_path, email, repo_name, username, "./", retrodeep_access_token)
+        workflow = deploy_local(framework, zip_file_path, email, repo_name, username, "./", retrodeep_access_token)
         os.remove(zip_file_path)
 
         if workflow.get('status') == 'completed':
@@ -748,10 +754,10 @@ def deploy(email, repo_name, project_name, directory, username, retrodeep_access
         print(f"An error occurred: {err}")
     return []
 
-def deploy_local(zip_file_path, email, project_name, username, directory, retrodeep_access_token):
+def deploy_local(framework, zip_file_path, email, project_name, username, directory, retrodeep_access_token):
     url = f"{DEPLOY_BASE_URL}/local"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
-    data = {'project_name': project_name, 'username': username, 'directory': directory, 'email': email}
+    data = {'project_name': project_name, 'username': username, 'directory': directory, 'email': email, 'framework': framework}
 
     try:
         with open(zip_file_path, 'rb') as f:
