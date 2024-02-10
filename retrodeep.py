@@ -37,6 +37,8 @@ from cryptography.fernet import Fernet
 
 app = Flask(__name__)
 
+# framework = None
+
 API_BASE_URL = "https://api.retrodeep.com/v1"
 SCM_BASE_URL = "https://scm.retrodeep.com"
 DEPLOY_BASE_URL = "https://deploy.retrodeep.com/v1"
@@ -64,8 +66,6 @@ class CustomFormatter(argparse.HelpFormatter):
         parts = super()._format_action(action).split('\n')
         parts_filtered = [part for part in parts if not part.strip().startswith('{')]
         return '\n'.join(parts_filtered)
-
-
 
 # Set to store previously generated codes to ensure uniqueness
 generated_codes = set()
@@ -277,13 +277,16 @@ def deploy_using_flags(args):
     if not os.path.exists(absolute_path) and os.path.isdir(absolute_path):
         print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} does not exist.")
         sys.exit(1)
-
-    if not glob.glob(os.path.join(absolute_path, '*.html')):
-        print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} does not exist.")
+    
+    framework = check_files_and_framework(absolute_path)
+    
+    if not framework:
+        print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} has no {Style.BOLD}.html{Style.RESET} file.")
         sys.exit(1)
 
+
     if check_project_exists(username, args.name, retrodeep_access_token):
-        print(f"> Project {Style.BOLD}{args.name}{Style.RESET} already exists.")
+        print(f"> A project with the name {Style.BOLD}{args.name}{Style.RESET} already exists.")
         repo_name = generate_domain_name(args.name)
     else:
         repo_name = args.name
@@ -855,60 +858,28 @@ def generate_unique_code(length=4):
             generated_codes.add(code)
             return code
 
-
-def detect_project_type(token, repo_name, org_name):
-    headers = {
-        'Authorization': f'token {token}',
-        'Accept': 'application/vnd.github.v3+json'
-    }
-    url = f"https://api.github.com/repos/{org_name}/{repo_name}/contents/package.json"
-    response = requests.get(url, headers=headers)
-
-    if response.status_code == 200:
-        package_content = base64.b64decode(response.json()['content']).decode()
-        package_json = json.loads(package_content)
-
-        dependencies = package_json.get("dependencies", {})
-        if "next" in dependencies:
-            return "nextjs"
-        elif "react" in dependencies and "react-dom" in dependencies:
-            return "react"
-    return "html"
-
-
-def detect_package_manager(token, org_name, repo_name):
-    headers = {
-        'Authorization': f'token {token}',
-        'Accept': 'application/vnd.github.v3+json'
-    }
-
-    # Check for yarn.lock
-    yarn_url = f"https://api.github.com/repos/{org_name}/{repo_name}/contents/yarn.lock"
-    response_yarn = requests.get(yarn_url, headers=headers)
-
-    # Check for package-lock.json
-    npm_url = f"https://api.github.com/repos/{org_name}/{repo_name}/contents/package-lock.json"
-    response_npm = requests.get(npm_url, headers=headers)
-
-    if response_yarn.status_code == 200:
-        return "yarn"
-    elif response_npm.status_code == 200:
-        return "npm"
-    else:
-        package_url = f"https://api.github.com/repos/{org_name}/{repo_name}/contents/package.json"
-        response_package = requests.get(package_url, headers=headers)
-        if response_package.status_code == 200:
-            package_content = base64.b64decode(
-                response_package.json()['content']).decode()
-            package_json = json.loads(package_content)
-            scripts = package_json.get("scripts", {})
-            for script in scripts.values():
-                if "yarn" in script:
-                    return "yarn"
-                elif "npm" in script:
-                    return "npm"
+def check_files_and_framework(directory):
+    # Check for HTML file presence
+    for file in os.listdir(directory):
+        if file.endswith('.html'):
+            return "html"
+    
+    # Check for package.json file presence
+    package_json_path = os.path.join(directory, 'package.json')
+    if os.path.exists(package_json_path):
+        with open(package_json_path) as f:
+            package_json = json.load(f)
+            
+            # Specify the key under which the framework is listed. For example: 'dependencies'
+            framework_key = 'dependencies'  # Change this as needed
+            
+            if framework_key in package_json:
+                # Assuming you want to check for specific frameworks listed under dependencies
+                frameworks = ['react', 'vue', 'next'] 
+                for framework in frameworks:
+                    if framework in package_json[framework_key]:
+                        return framework
     return None
-
 
 def compress_directory(source_dir, output_filename):
     shutil.make_archive(output_filename, 'zip', source_dir)
