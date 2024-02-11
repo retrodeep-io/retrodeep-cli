@@ -95,8 +95,8 @@ def deploy_from_local(username, email, retrodeep_access_token):
         directory_question = {
             'type': 'input',
             'name': 'directory',
-            'message': 'Enter the directory path (default: current directory):',
-            'default': '.'
+            'message': 'Enter the path to the directory containing your codebase:',
+            'default': './'
         }
         directory = prompt(directory_question)['directory']
 
@@ -105,12 +105,12 @@ def deploy_from_local(username, email, retrodeep_access_token):
 
         if directory and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
             # Check for the existence of .html file
-            if glob.glob(os.path.join(absolute_path, '*.html')):
+            if glob.glob(os.path.join(absolute_path, '*.html')) or glob.glob(os.path.join(absolute_path, 'package.json')) :
                 print(
                     f"> You are about to deploy from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
                 break
             else:
-                print("> There is no index.html file in the provided path.")
+                print("> There is no .html or package.json file in the provided path.")
                 choice_question = {
                     'type': 'list',
                     'name': 'choice',
@@ -126,17 +126,59 @@ def deploy_from_local(username, email, retrodeep_access_token):
 
     framework = check_files_and_framework(absolute_path)
     
-    if not framework:
-        print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} has no {Style.BOLD}.html{Style.RESET} file.")
-        sys.exit(1)
+    if framework != "html":
+        print(f"> Auto-detected Project Settings for {Style.BOLD}{framework}{Style.RESET}:")
+        # print(f"What's your {Style.BOLD}Build command{Style.RESET}:")
+
+        while True:
+            build_command_question = {
+                'type': 'input',
+                'name': 'build_command',
+                'message': "Enter your Build command:",
+                'default': 'npm build'
+            }
+
+            build_command = prompt(build_command_question)['build_command']
+        
+            install_command_question = {
+                'type': 'input',
+                'name': 'install_command',
+                'message': 'Enter your Install command:',
+                'default': 'npm install'
+            }
+
+            install_command = prompt(install_command_question)['install_command']
+
+            build_output_question = {
+                'type': 'input',
+                'name': 'build_output',
+                'message': 'Enter your Output directory:',
+                'default': 'build'
+            }
+
+            build_output = prompt(build_output_question)['build_output']
+
+            # if not framework:
+            #     print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} has no {Style.BOLD}.html{Style.RESET} file.")
+            #     sys.exit(1)
+        
+            print(f"{Style.GREY}- Build Command: {build_command}{Style.RESET}")
+            print(f"{Style.GREY}- Install Command: {install_command}{Style.RESET}")
+            print(f"{Style.GREY}- Build Output Directory: {build_output}{Style.RESET}")
+
+            if not confirm_action(f"> {Style.CYAN}{Style.BOLD}Would you like to modify these settings?{Style.RESET}"):
+                break
 
     start_time = time.time()
     zip_file_path = compress_directory(absolute_path, project_name)
     
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
-        workflow = deploy_local(framework, zip_file_path, email, project_name, username, "./", retrodeep_access_token)
-        os.remove(zip_file_path)
+        if framework == "html":
+            workflow = deploy_local(framework, zip_file_path, email, project_name, username, "./", retrodeep_access_token)
+        else:
+            workflow = deploy_local(framework, zip_file_path, email, project_name, username, "./", retrodeep_access_token, install_command, build_command, build_output)
 
+        os.remove(zip_file_path)
         if workflow.get('status') == 'completed':
             spinner.ok("✔")
         else:
@@ -737,12 +779,20 @@ def list_user_repos(token):
     return [repo.name for repo in user.get_repos()]
 
 
-def deploy(email, repo_name, project_name, directory, username, retrodeep_access_token):
+def deploy(email, repo_name, project_name, directory, username, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
     url = f"{DEPLOY_BASE_URL}/repo/github"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
-    data = {'email': email, 'repo_name': repo_name,
-            'project_name': project_name, 'directory': directory, 'username': username}
-
+    data = {
+            'email': email, 
+            'repo_name': repo_name,
+            'project_name': project_name, 
+            'directory': directory, 
+            'username': username, 
+            'install_command': install_command, 
+            'build_command': build_command, 
+            'build_output': build_output
+            }
+    
     try:
         response = requests.post(url, json=data, headers=headers)
         response.raise_for_status()
