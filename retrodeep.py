@@ -196,6 +196,7 @@ def deploy_from_local(username, email, retrodeep_access_token):
         spinner.ok("✔")
     print(
         f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
+    print(f"> 🧪 Deployment: \033[1m\x1b]8;;{workflow.get('url3')}\x1b\\{workflow.get('url4')}\x1b]8;;\x1b\\\033[0m")
     print("> 🎉 Congratulations! Your project is now up and running.")
     sys.exit(0)
 
@@ -260,7 +261,8 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
         spinner.ok("✔")
     print(
-        f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
+        f"> 🔗 Your website is live at: {Style.BOLD}{workflow.get('url2')}{Style.RESET}")
+    print(f"> 🧪 Deployment: {Style.BOLD}{workflow.get('url4')}{Style.RESET}")
     print("> 🎉 Congratulations! Your project is now up and running.")
 
     sys.exit(0)
@@ -371,6 +373,7 @@ def deploy_using_flags(args):
         spinner.ok("✔")
     print(
         f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
+    print(f"> 🧪 Deployment: \033[1m\x1b]8;;{workflow.get('url3')}\x1b\\{workflow.get('url4')}\x1b]8;;\x1b\\\033[0m")
     print("> 🎉 Congratulations! Your project is now up and running.")
     sys.exit(0)
 
