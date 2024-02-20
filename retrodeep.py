@@ -197,7 +197,7 @@ def deploy_from_local(username, email, retrodeep_access_token):
         spinner.ok("✔")
     print(
         f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
-    print(f"> 🧪 Deployment: \033[1m\x1b]8;;{workflow.get('url3')}\x1b\\{workflow.get('url4')}\x1b]8;;\x1b\\\033[0m")
+    print(f"> 🧪 Deployment URL: \033[1m\x1b]8;;{workflow.get('url3')}\x1b\\{workflow.get('url4')}\x1b]8;;\x1b\\\033[0m")
     print("> 🎉 Congratulations! Your project is now up and running.")
     sys.exit(0)
 
@@ -222,8 +222,25 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         print("You do not have any repositories")
         sys.exit(1)
 
+    # Fetch and select a branch from the repository
+    branches = list_repo_branches(token, repo_name, username)
+    if branches:
+        branch_questions = [
+            {
+                'type': 'list',
+                'name': 'branch',
+                'message': 'Select the branch you want to deploy:',
+                'choices': branches
+            }
+        ]
+        branch_answers = prompt(branch_questions)
+        branch_name = branch_answers['branch']
+    else:
+        print("No branches found in this repository.")
+        sys.exit(1)
+
     # Fetch the directories from the repository
-    directories = get_repo_directories(token, username, repo_name)
+    directories = get_repo_directories(token, username, repo_name, branch_name)
 
     name_of_project = name_of_project_prompt_repo(repo_name, username, retrodeep_access_token)
 
@@ -248,14 +265,14 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
 
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
         # Fork the selected repository to the organization
-        workflow = deploy(email, repo_name, name_of_project,
+        workflow = deploy(email, repo_name, branch_name, name_of_project,
                           directory, username, retrodeep_access_token)
         if workflow.get('status') == 'completed':
             spinner.ok("✔")
 
     with yaspin(text=F"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
-        while not is_domain_up(workflow.get('url2')):
-            time.sleep(0.2)
+        # while not is_domain_up(workflow.get('url2')):
+        #     time.sleep(0.2)
         spinner.ok("✔")
 
     duration = round(time.time() - start_time, 2)
@@ -305,7 +322,15 @@ def init(debug=False):
             deploy_from_repo(token, username, email, retrodeep_access_token)
 
     except SystemExit as e:
+        # print(f"Exiting: {e}") 
+        # turn the above line off to not print error
         sys.exit(e)
+    except Exception as e:
+        # This block will catch any other exceptions
+        # print("An error occurred:")
+        # traceback.print_exc()  # This will print the stack trace of the exception
+        # turn the above line off to not print error
+        sys.exit(1)  # Exit after printing the error details
     except:
         raise SystemExit()
 
@@ -782,13 +807,20 @@ def list_user_repos(token):
     user = g.get_user()
     return [repo.name for repo in user.get_repos()]
 
+def list_repo_branches(token, repo_name, username):
+    g = Github(token)
+    repo_full_name = f"{username}/{repo_name}"
+    repo = g.get_repo(repo_full_name)
+    return [branch.name for branch in repo.get_branches()]
 
-def deploy(email, repo_name, project_name, directory, username, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
+
+def deploy(email, repo_name, branch, project_name, directory, username, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
     url = f"{DEPLOY_BASE_URL}/repo/github"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
     data = {
             'email': email, 
             'repo_name': repo_name,
+            'branch': branch,
             'project_name': project_name, 
             'directory': directory, 
             'username': username, 
@@ -833,13 +865,13 @@ def deploy_local(framework, zip_file_path, email, project_name, username, direct
             error_message = str(e)
         return {"error": f"Request failed: {error_message}"}
 
-def get_repo_directories(token, org_name, repo_name, path="."):
+def get_repo_directories(token, org_name, repo_name, branch_name, path="."):
     headers = {
         'Authorization': f'token {token}',
         'Accept': 'application/vnd.github.v3+json'
     }
 
-    url = f"https://api.github.com/repos/{org_name}/{repo_name}/contents/{path}"
+    url = f"https://api.github.com/repos/{org_name}/{repo_name}/contents/{path}?ref={branch_name}"
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     content = response.json()
@@ -850,7 +882,7 @@ def get_repo_directories(token, org_name, repo_name, path="."):
             subdir_path = f"{path}/{item['name']}" if path != "." else item['name']
             directories.append(subdir_path)
             directories.extend(get_repo_directories(
-                token, org_name, repo_name, subdir_path))
+                token, org_name, repo_name, branch_name, subdir_path))
     return directories
 
 def name_of_project_prompt_repo(repo_name, username, retrodeep_access_token):
