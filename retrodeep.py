@@ -32,6 +32,7 @@ from yaspin import yaspin
 import glob
 import http.server
 import socketserver
+import randomname
 
 from cryptography.fernet import Fernet
 
@@ -606,7 +607,7 @@ def confirm_action(prompt):
         sys.exit(1)
 
 def generate_domain_name(project_name):
-    return f"{project_name}-{generate_unique_code()}"
+    return f"{project_name}-{randomname.get_name(noun=('cats', 'astronomy' 'food'))}"
 
 
 def get_user_projects(username, retrodeep_access_token, email_address):

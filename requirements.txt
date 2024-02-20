@@ -23,3 +23,5 @@ waitress
 cryptography
 uuid
 yaspin
+randomname
+tabulate
