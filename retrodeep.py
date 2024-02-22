@@ -542,6 +542,16 @@ def list_projects(args):
 
     get_user_projects(username, retrodeep_access_token, email)
 
+def list_projects_deployments(args):
+    credentials = login_for_workflow()
+    
+    username = credentials['username']
+    email = credentials['email_address']
+    retrodeep_access_token = credentials['retrodeep_access_token']
+
+    get_project_deployments(username, retrodeep_access_token, email, args.project_name)
+
+
 
 def delete_project(args):
     credentials = login_for_workflow()
@@ -651,12 +661,12 @@ def get_user_projects(username, retrodeep_access_token, email_address):
         projects_list = [
             {
                 f'{Style.BOLD}Project Name{Style.RESET}': f" {Style.BOLD}{project['project_name']}{Style.RESET}",
-                f'{Style.BOLD}Deployment URL{Style.RESET}': f"https://{project['domain_name']}.retrodeep.app",
+                f'{Style.BOLD}Production URL{Style.RESET}': f"https://{project['domain_name']}.retrodeep.app",
                 f'{Style.BOLD}Last Updated{Style.RESET}': format_days_since(project['updated_at'])
             }
             for project in projects_data
         ]
-        print(f"> Projects for user {Style.BOLD}{email_address}{Style.RESET}\n")
+        print(f"> Projects for user {Style.BOLD}{username}{Style.RESET}\n")
         print(tabulate(projects_list, headers='keys', tablefmt='plain'))
     else:
         print(
@@ -703,6 +713,34 @@ def add_new_project(username, email, project_name, domain_name, repo_name, retro
             print(response_data)
         else:
             print("No JSON response data.")
+
+def get_project_deployments(username, retrodeep_access_token, email_address, project_name):
+    url = f"{API_BASE_URL}/deployments"
+    headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
+    data = {'username': username, 'project_name':project_name}
+    response = requests.get(url, json=data, headers=headers)
+
+    if response.status_code == 200:
+        deployments_data = response.json()
+
+        if not deployments_data:  # Check if the projects list is empty
+            print(f"No deployments found for {username}.")
+            return
+
+        deployment_list = [
+            {
+                f'{Style.BOLD}Deployment ID{Style.RESET}': f"{Style.BOLD}{deployment['deployment_id']}{Style.RESET}",
+                f'{Style.BOLD}Deployment{Style.RESET}': f"https://{deployment['url']}.retrodeep.app",
+                f'{Style.BOLD}Status{Style.RESET}': f"{Style.BOLD}{deployment['status']}{Style.RESET}",
+                f'{Style.BOLD}Created{Style.RESET}': format_days_since(deployment['created_at'])
+            }
+            for deployment in deployments_data
+        ]
+        print(f"> Deployments of project {Style.BOLD}{project_name}{Style.RESET} for user {Style.BOLD}{username}{Style.RESET}\n")
+        print(tabulate(deployment_list, headers='keys', tablefmt='plain'))
+    else:
+        print(
+            f"Failed to retrieve projects for {username}. Status Code: {response.status_code}")
 
 
 def delete_project_request(username, project_name, retrodeep_access_token):
@@ -1030,10 +1068,18 @@ if __name__ == "__main__":
         "logout", help="Log out of Retrodeep")
     parser_logout.set_defaults(func=logout)
 
-    # list all deployments command
+    # list all projects command
     parser_listProjects = subparsers.add_parser(
-        "projects", help="List all deployments on Retrodeep")
+        "projects", help="List all projects on Retrodeep")
     parser_listProjects.set_defaults(func=list_projects)
+
+     # logs deployment command
+    parser_logsProjects = subparsers.add_parser(
+        "ls", help="View the logs of a deployment")
+    parser_logsProjects.add_argument(
+        "project_name",
+        help="")
+    parser_logsProjects.set_defaults(func=list_projects_deployments)
 
     # delete deployment command
     parser_deleteProjects = subparsers.add_parser(
