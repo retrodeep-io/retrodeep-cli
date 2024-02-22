@@ -549,7 +549,7 @@ def list_projects_deployments(args):
     email = credentials['email_address']
     retrodeep_access_token = credentials['retrodeep_access_token']
 
-    get_project_deployments(username, retrodeep_access_token, email, args.project_name)
+    get_project_deployments(username, retrodeep_access_token, email, args.deployment_url)
 
 
 
@@ -642,7 +642,7 @@ def confirm_action(prompt):
         sys.exit(1)
 
 def generate_domain_name(project_name):
-    return f"{project_name}-{randomname.get_name(noun=('cats', 'astronomy' 'food'))}"
+    return f"{project_name}-{randomname.get_name(noun=('cats', 'astronomy', 'food'))}"
 
 
 def get_user_projects(username, retrodeep_access_token, email_address):
@@ -661,7 +661,7 @@ def get_user_projects(username, retrodeep_access_token, email_address):
         projects_list = [
             {
                 f'{Style.BOLD}Project Name{Style.RESET}': f" {Style.BOLD}{project['project_name']}{Style.RESET}",
-                f'{Style.BOLD}Production URL{Style.RESET}': f"https://{project['domain_name']}.retrodeep.app",
+                f'{Style.BOLD}Production URL{Style.RESET}': f"https://{project['domain_name']}",
                 f'{Style.BOLD}Last Updated{Style.RESET}': format_days_since(project['updated_at'])
             }
             for project in projects_data
@@ -730,7 +730,7 @@ def get_project_deployments(username, retrodeep_access_token, email_address, pro
         deployment_list = [
             {
                 f'{Style.BOLD}Deployment ID{Style.RESET}': f"{Style.BOLD}{deployment['deployment_id']}{Style.RESET}",
-                f'{Style.BOLD}Deployment{Style.RESET}': f"https://{deployment['url']}.retrodeep.app",
+                f'{Style.BOLD}Deployment{Style.RESET}': f"https://{deployment['url']}",
                 f'{Style.BOLD}Status{Style.RESET}': f"{Style.BOLD}{deployment['status']}{Style.RESET}",
                 f'{Style.BOLD}Created{Style.RESET}': format_days_since(deployment['created_at'])
             }
@@ -740,7 +740,7 @@ def get_project_deployments(username, retrodeep_access_token, email_address, pro
         print(tabulate(deployment_list, headers='keys', tablefmt='plain'))
     else:
         print(
-            f"Failed to retrieve projects for {username}. Status Code: {response.status_code}")
+            f"Failed to retrieve Deployments for {project_name}. Status Code: {response.status_code}")
 
 
 def delete_project_request(username, project_name, retrodeep_access_token):
@@ -757,26 +757,41 @@ def delete_project_request(username, project_name, retrodeep_access_token):
             f"Failed to delete project. Status Code: {response.status_code}")
         print(response.json())
 
+def remove_https(url):
+    # Regular expression to match and remove 'https://' if it exists
+    pattern = r'^https?://(.+)$'
+    
+    # Search for the pattern in the given URL and remove 'https://' or 'http://' if present
+    match = re.match(pattern, url)
+    
+    if match:
+        # Return the URL without 'https://'
+        return match.group(1)
+    else:
+        # Return the original URL if 'https://' is not present
+        return url
+
 def fetch_and_display_logs(args):
     credentials = login_for_workflow()
-    
-    username = credentials['username']
     retrodeep_access_token = credentials['retrodeep_access_token']
 
-    project_name = args.project_name
-    if not project_name:
-        print("Error: Project name is required.")
+    deployment_url = args.deployment_url
+
+    if not deployment_url:
+        print("Error: Deployment URL is required.")
         parser_deleteProjects.print_help()
         sys.exit(1)
 
-    url = f"{API_BASE_URL}/logs/{args.project_name}"
+    subdomain = remove_https(deployment_url)
+
+    url = f"{API_BASE_URL}/deployments/{subdomain}/logs"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
 
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         logs = response.json()
-        print(f"> Fetched logs for deployment {project_name} for {Style.BOLD}{project_name}{Style.RESET} ")
-        for log in logs:
+        print(f"> Fetched logs for deployment {Style.BOLD}{logs.get('deployment_url')}{Style.RESET}")
+        for log in logs.get('logs'):
             print(f"{Style.GREY}{log['timestamp']}{Style.RESET}  {log['message']}")
     else:
         print(f"Failed to retrieve logs: {response.status_code}")
@@ -1054,7 +1069,7 @@ if __name__ == "__main__":
     parser_logsProjects = subparsers.add_parser(
         "logs", help="View the logs of a deployment")
     parser_logsProjects.add_argument(
-        "project_name",
+        "deployment_url",
         help="")
     parser_logsProjects.set_defaults(func=fetch_and_display_logs)
 
@@ -1075,9 +1090,9 @@ if __name__ == "__main__":
 
      # logs deployment command
     parser_logsProjects = subparsers.add_parser(
-        "ls", help="View the logs of a deployment")
+        "ls", help="List all deployments of a project")
     parser_logsProjects.add_argument(
-        "project_name",
+        "deployment_url",
         help="")
     parser_logsProjects.set_defaults(func=list_projects_deployments)
 
