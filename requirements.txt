@@ -25,3 +25,4 @@ uuid
 yaspin
 randomname
 tabulate
+alive-progress
