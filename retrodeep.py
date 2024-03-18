@@ -35,18 +35,24 @@ import socketserver
 import randomname
 import zipfile
 from alive_progress import alive_bar
+import ssl
+import asyncio
+import websockets
+import socketio
+
 
 from cryptography.fernet import Fernet
 
 app = Flask(__name__)
 
+sio = socketio.AsyncClient()
+
 # framework = None
 
 API_BASE_URL = "https://api.retrodeep.com/v1"
-SCM_BASE_URL = "https://scm.retrodeep.com"
-DEPLOY_BASE_URL = "https://deploy.retrodeep.com/v1"
+SSE_BASE_URL = "https://sse.retrodeep.com/stream"
 AUTH_BASE_URL = "https://auth.retrodeep.com"
-__version__ = "1.0.0"
+__version__ = "0.0.1 Pre-Release"
 
 # ANSI escape codes for colors and styles
 class Style:
@@ -57,6 +63,8 @@ class Style:
     DIM = '\033[2m'
     CYAN = '\033[36m'
     UNDERLINE = '\033[4m'
+
+one_gb = 1024 ** 3
 
 class CustomFormatter(argparse.HelpFormatter):
     def _format_usage(self, usage, actions, groups, prefix):
@@ -72,6 +80,8 @@ class CustomFormatter(argparse.HelpFormatter):
 
 # Set to store previously generated codes to ensure uniqueness
 generated_codes = set()
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -91,7 +101,7 @@ if not os.path.exists(config_directory):
     os.makedirs(config_directory)
 
 def deploy_from_local(username, email, retrodeep_access_token):
-
+    source = "local"
     project_name = name_of_project_prompt(username, retrodeep_access_token)
 
     while True:
@@ -107,6 +117,10 @@ def deploy_from_local(username, email, retrodeep_access_token):
         absolute_path = os.path.abspath(directory)
 
         if directory and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
+            dir_size = get_dir_size(absolute_path)
+            if dir_size > one_gb:
+                print(f"{Style.RED} Error:{Style.RESET} The file size {Style.BOLD}{dir_size}{Style.RESET} exceeds the maximum allowed size of 1GB")
+                return
             # Check for the existence of .html file
             if glob.glob(os.path.join(absolute_path, '*.html')) or glob.glob(os.path.join(absolute_path, 'package.json')) :
                 print(
@@ -127,87 +141,88 @@ def deploy_from_local(username, email, retrodeep_access_token):
         else:
             print("> Invalid directory. Please enter a valid directory path.")
 
-    framework = check_files_and_framework_local(absolute_path)
+    # framework = check_files_and_framework_local(absolute_path)
     
-    if framework != "html":
-        print(f"> Auto-detected Project Settings for {Style.BOLD}{framework}{Style.RESET}:")
-        # print(f"What's your {Style.BOLD}Build command{Style.RESET}:")
+    # if framework != "html":
+    #     print(f"> Auto-detected Project Settings for {Style.BOLD}{framework}{Style.RESET}:")
+    #     # print(f"What's your {Style.BOLD}Build command{Style.RESET}:")
 
-        while True:
-            build_command_question = {
-                'type': 'input',
-                'name': 'build_command',
-                'message': "Enter your Build command:",
-                'default': 'npm run build'
-            }
+    #     while True:
+    #         build_command_question = {
+    #             'type': 'input',
+    #             'name': 'build_command',
+    #             'message': "Enter your Build command:",
+    #             'default': 'npm run build'
+    #         }
 
-            build_command = prompt(build_command_question)['build_command']
+    #         build_command = prompt(build_command_question)['build_command']
         
-            install_command_question = {
-                'type': 'input',
-                'name': 'install_command',
-                'message': 'Enter your Install command:',
-                'default': 'npm install'
-            }
+    #         install_command_question = {
+    #             'type': 'input',
+    #             'name': 'install_command',
+    #             'message': 'Enter your Install command:',
+    #             'default': 'npm install'
+    #         }
 
-            install_command = prompt(install_command_question)['install_command']
+    #         install_command = prompt(install_command_question)['install_command']
 
-            build_output_question = {
-                'type': 'input',
-                'name': 'build_output',
-                'message': 'Enter your Output directory:',
-                'default': 'build'
-            }
+    #         build_output_question = {
+    #             'type': 'input',
+    #             'name': 'build_output',
+    #             'message': 'Enter your Output directory:',
+    #             'default': 'build'
+    #         }
 
-            build_output = prompt(build_output_question)['build_output']
+    #         build_output = prompt(build_output_question)['build_output']
 
-            # if not framework:
-            #     print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} has no {Style.BOLD}.html{Style.RESET} file.")
-            #     sys.exit(1)
+    #         # if not framework:
+    #         #     print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} has no {Style.BOLD}.html{Style.RESET} file.")
+    #         #     sys.exit(1)
         
-            print(f"{Style.GREY}- Build Command: {build_command}{Style.RESET}")
-            print(f"{Style.GREY}- Install Command: {install_command}{Style.RESET}")
-            print(f"{Style.GREY}- Build Output Directory: {build_output}{Style.RESET}")
+    #         print(f"{Style.GREY}- Build Command: {build_command}{Style.RESET}")
+    #         print(f"{Style.GREY}- Install Command: {install_command}{Style.RESET}")
+    #         print(f"{Style.GREY}- Build Output Directory: {build_output}{Style.RESET}")
 
-            if not confirm_action(f"> {Style.CYAN}{Style.BOLD}Would you like to modify these settings?{Style.RESET}"):
-                break
+    #         if not confirm_action(f"> {Style.CYAN}{Style.BOLD}Would you like to modify these settings?{Style.RESET}"):
+    #             break
 
     zip_file_path = compress_directory(absolute_path, project_name)
     
     start_time = time.time()
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
-        if framework == "html":
-            workflow = deploy_local(framework, zip_file_path, email, project_name, username, "./", retrodeep_access_token)
-        else:
-            workflow = deploy_local(framework, zip_file_path, email, project_name, username, "./", retrodeep_access_token, install_command, build_command, build_output)
+        # if framework == "html":
+        #     workflow = deploy_local(framework, zip_file_path, email, project_name, source, username, "./", retrodeep_access_token)
+        # else:
+        #     workflow = deploy_local(framework, zip_file_path, email, project_name, source, username, "./", retrodeep_access_token, install_command, build_command, build_output)
 
+        workflow = deploy_local(zip_file_path, email, project_name, source, username, "./", retrodeep_access_token)
+        
         os.remove(zip_file_path)
-        if workflow.get('status') == 'completed':
-            spinner.ok("✔")
-        else:
-            spinner.ok("x")
-            sys.exit(1)
+        print(f"workflow: {workflow}")
 
-    # Check if workflow completed successfully
-    with yaspin(text=f"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
-        # while not is_domain_up(workflow.get('url2')):
-        #     time.sleep(0.2)
-        spinner.ok("✔")
+        deployment_params = listen_to_sse(workflow.get('deployment_id'))
+
+        if deployment_params == "Failed":
+            spinner.ok("✘")
+        else:
+            spinner.ok("✔")
 
     duration = round(time.time() - start_time, 2)
-    with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
-        spinner.ok("✔")
-    print(
-        f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
-    print(f"> 🧪 Deployment URL: \033[1m\x1b]8;;{workflow.get('url3')}\x1b\\{workflow.get('url4')}\x1b]8;;\x1b\\\033[0m")
-    print("> 🎉 Congratulations! Your project is now up and running.")
-    sys.exit(0)
+    if deployment_params == "Failed":
+        print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
+    else:
+        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
+            spinner.ok("✔")
+        print(
+            f"> 🔗 Your website is live at: {Style.BOLD}{deployment_params['url2']}{Style.RESET}")
+        print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
+        print("> 🎉 Congratulations! Your project is now up and running.")
 
 
 def deploy_from_repo(token, username, email, retrodeep_access_token):
+    source = 'github'
     repos = list_user_repos(token)
     
-    # The prompt for selecting a repository
     if repos:
         questions = [
             {
@@ -219,7 +234,6 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         ]
         answers = prompt(questions)
         repo_name = answers['repo']
-        # Proceed with the selected repository
     else:
         print("You do not have any repositories")
         sys.exit(1)
@@ -262,22 +276,17 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
 
     dir_answer = prompt(questions)
     directory = dir_answer['directory']
-    directory = strip_dot_slash(directory)
-    print(directory)
 
-    directory_contents = get_repo_directory_contents(token, username, repo_name, branch_name, directory)
+    directory_contents = get_repo_directory_contents(token, username, repo_name, branch_name, strip_dot_slash(directory))
 
     # Check for package.json in the directory contents
     if 'package.json' in directory_contents:
         package_json_content = get_file_content(token, username, repo_name, branch_name, f"{directory}/package.json")
-        # Analyze the package.json content to determine the project framework
         project_framework = analyze_package_json(package_json_content)
-        # print(f"Detected project framework: {project_framework}")
     else:
         # Check for HTML files as a fallback
         html_files = [file for file in directory_contents if file.endswith('.html')]
         if html_files:
-            # print("Detected a static HTML site.")
             project_framework = "html"
         else:
             print("No recognizable project type found.")
@@ -285,14 +294,13 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     
     if project_framework != "html":
         print(f"> Auto-detected Project Settings for {Style.BOLD}{project_framework}{Style.RESET}:")
-        # print(f"What's your {Style.BOLD}Build command{Style.RESET}:")
 
         while True:
             build_command_question = {
                 'type': 'input',
                 'name': 'build_command',
                 'message': "Enter your Build command:",
-                'default': 'npm run build'
+                'default': 'yarn build'
             }
 
             build_command = prompt(build_command_question)['build_command']
@@ -301,7 +309,7 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
                 'type': 'input',
                 'name': 'install_command',
                 'message': 'Enter your Install command:',
-                'default': 'npm install'
+                'default': 'yarn install'
             }
 
             install_command = prompt(install_command_question)['install_command']
@@ -310,7 +318,7 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
                 'type': 'input',
                 'name': 'build_output',
                 'message': 'Enter your Output directory:',
-                'default': 'build'
+                'default': 'out' if project_framework == "Next.js" else 'build',
             }
 
             build_output = prompt(build_output_question)['build_output']
@@ -328,28 +336,30 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         # Fork the selected repository to the organization
         if project_framework == "html":
             workflow = deploy(email, repo_name, branch_name, name_of_project,
-                          directory, username, retrodeep_access_token)
+                          directory, project_framework, source, username, retrodeep_access_token)
         else:
             workflow = deploy(email, repo_name, branch_name, name_of_project,
-                          directory, username, retrodeep_access_token, install_command,build_command, build_output)
-        
-        if workflow.get('status') == 'completed':
+                          directory, project_framework, source, username, retrodeep_access_token, install_command,build_command, build_output)
+            
+        print(workflow)
+            
+        deployment_params = listen_to_sse(workflow.get('deployment_id'))
+
+        if deployment_params == "Failed":
+            spinner.ok("✘")
+        else:
             spinner.ok("✔")
-
-    with yaspin(text=F"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
-        # while not is_domain_up(workflow.get('url2')):
-        #     time.sleep(0.2)
-        spinner.ok("✔")
-
+    
     duration = round(time.time() - start_time, 2)
-    with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
-        spinner.ok("✔")
-    print(
-        f"> 🔗 Your website is live at: {Style.BOLD}{workflow.get('url2')}{Style.RESET}")
-    print(f"> 🧪 Deployment: {Style.BOLD}{workflow.get('url4')}{Style.RESET}")
-    print("> 🎉 Congratulations! Your project is now up and running.")
-
-    sys.exit(0)
+    if deployment_params == "Failed":
+        print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
+    else:
+        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
+            spinner.ok("✔")
+        print(
+            f"> 🔗 Your website is live at: {Style.BOLD}{deployment_params['url2']}{Style.RESET}")
+        print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
+        print("> 🎉 Congratulations! Your project is now up and running.")
 
 
 def init(debug=False):
@@ -394,13 +404,15 @@ def init(debug=False):
     except Exception as e:
         # This block will catch any other exceptions
         # print("An error occurred:")
-        # traceback.print_exc()  # This will print the stack trace of the exception
+        traceback.print_exc()  # This will print the stack trace of the exception
         # turn the above line off to not print error
         sys.exit(1)  # Exit after printing the error details
     except:
         raise SystemExit()
 
 def deploy_using_flags(args):
+    source = "local"
+
     credentials = get_stored_credentials()
     if credentials:
         token = credentials['access_token']
@@ -429,22 +441,22 @@ def deploy_using_flags(args):
 
     if check_project_exists(username, args.name, retrodeep_access_token):
         print(f"> A project with the name {Style.BOLD}{args.name}{Style.RESET} already exists.")
-        repo_name = generate_domain_name(args.name)
+        project_name = generate_domain_name(args.name)
     else:
-        repo_name = args.name
+        project_name = args.name
 
-    print(f"You are about to deploy the project {Style.BOLD}{repo_name}{Style.RESET} from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
+    print(f"> You are about to deploy the project {Style.BOLD}{project_name}{Style.RESET} from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
     
     if not confirm_action(f"> {Style.CYAN}{Style.BOLD}Do you want to continue?{Style.RESET}"):
         print("> Operation canceled")
         sys.exit(0)
 
-    start_time = time.time()
     zip_file_path = compress_directory(absolute_path, args.name)
-    print(zip_file_path)
+
+    start_time = time.time()
 
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
-        workflow = deploy_local(framework, zip_file_path, email, repo_name, username, "./", retrodeep_access_token)
+        workflow = deploy_local(zip_file_path, email, project_name, source, username, "./", retrodeep_access_token)
         os.remove(zip_file_path)
 
         if workflow.get('status') == 'completed':
@@ -936,9 +948,32 @@ def list_repo_branches(token, repo_name, username):
 def strip_dot_slash(input_string):
     return input_string.replace("./", "")
 
+def listen_to_sse(deployment_id):
+    url = f"{SSE_BASE_URL}/{deployment_id}"  # Adjust the URL as needed based on your server configuration
+    try:
+        with requests.get(url, stream=True) as response:
+            for line in response.iter_lines():
+                if line:
+                    decoded_line = line.decode('utf-8')
+                    if decoded_line.startswith('data:'):
+                        data = decoded_line.split("data: ", 1)[1]
+                        if data == "Failed":
+                            # print("Deployment failed.")
+                            return "Failed"
+                        elif "log" in data:
+                            # Assuming log entries are wrapped in {"log": "message"}
+                            log_data = json.loads(data)
+                            print(log_data.get("log"))  # Print log messages continuously
+                        else:
+                            return json.loads(data)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return {"error": str(e)}
+    except KeyboardInterrupt:
+        print("Operation Canceled.")
 
-def deploy(email, repo_name, branch, project_name, directory, username, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
-    url = f"{DEPLOY_BASE_URL}/repo/github"
+def deploy(email, repo_name, branch, project_name, directory, framework, source, username, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
+    url = f"{API_BASE_URL}/deploy"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
     data = {
             'email': email, 
@@ -949,46 +984,38 @@ def deploy(email, repo_name, branch, project_name, directory, username, retrodee
             'username': username, 
             'install_command': install_command, 
             'build_command': build_command, 
-            'build_output': build_output
+            'build_output': build_output,
+            'framework': framework,
+            'source': source
             }
-    
-    try:
-        response = requests.post(url, json=data, headers=headers)
-        response.raise_for_status()
-        workflow = response.json()
-        return workflow
-    except requests.exceptions.HTTPError as err:
-        print(f"HTTP error occurred: {err}")
-    except Exception as err:
-        print(f"An error occurred: {err}")
-    return []
 
-def deploy_local(framework, zip_file_path, email, project_name, username, directory, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
-    url = f"{DEPLOY_BASE_URL}/local"
+    try:
+        response = requests.post(url, json=data, headers=headers, timeout=10)  # Adjusted timeout
+        if response.status_code == 202:  # Assuming 202 Accepted as the queueing response
+            return response.json()
+    except requests.exceptions.RequestException as err:
+        print(f"Request error: {err}")
+    # return False
+
+def deploy_local(zip_file_path, email, project_name, source, username, directory, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
+    url = f"{API_BASE_URL}/deploy"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}  
-    data = {'project_name': project_name, 'username': username, 'directory': directory, 'email': email, 'framework': framework, 'install_command': install_command, 'build_command': build_command, 'build_output': build_output}
+    data = {'project_name': project_name, 'username': username, 'directory': directory, 'email': email, 'framework': framework, "source": source}
 
 
-
-    try:
-        with open(zip_file_path, 'rb') as f:
-            files = {'file': (os.path.basename(zip_file_path), f)}
-            response = requests.post(url, data=data, files=files, headers=headers)
-            response.raise_for_status()
-
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        # More detailed error handling
-        if hasattr(e, 'response') and e.response is not None:
-            try:
-                # Attempt to decode JSON error message
-                error_message = e.response.json()
-            except ValueError:
-                # Fallback if response is not in JSON format
-                error_message = e.response.text
-        else:
-            error_message = str(e)
-        return {"error": f"Request failed: {error_message}"}
+    with open(zip_file_path, 'rb') as f:
+        encoded_zip = base64.b64encode(f.read()).decode('utf-8')
+    
+    data['encoded_file'] = encoded_zip
+    
+    try:   
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code == 202:
+            return response.json()
+    
+    except requests.exceptions.RequestException as err:
+        print(f"Request error: {err}")
+    # return False
 
 def get_repo_directories(token, org_name, repo_name, branch_name, path="."):
     headers = {
@@ -1075,10 +1102,10 @@ def get_file_content(token, username, repo_name, branch_name, file_path):
 def analyze_package_json(package_json_content):
     # This function would parse the package.json content and return a string indicating the project framework
     package_json = json.loads(package_json_content)
-    if 'react' in package_json.get('dependencies', {}):
-        return "Create React App"
-    elif 'next' in package_json.get('dependencies', {}):
+    if 'next' in package_json.get('dependencies', {}):
         return "Next.js"
+    elif 'react' in package_json.get('dependencies', {}):
+        return "Create React App"
     # Add more framework checks as needed
     return "Unknown"
 
@@ -1192,6 +1219,16 @@ def compress_directory(source_dir, output_filename):
 
     return f"{output_filename}.zip"
 
+def get_dir_size(path):
+    """Calculate the total size of all files in the specified directory."""
+    total_size = 0
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            filepath = os.path.join(root, file)
+            # Skip if it is symbolic link
+            if not os.path.islink(filepath):
+                total_size += os.path.getsize(filepath)
+    return total_size
 
 def Exit_gracefully(signum, frame):
     # exit(1)
