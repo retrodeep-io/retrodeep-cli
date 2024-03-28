@@ -37,15 +37,11 @@ import zipfile
 from alive_progress import alive_bar
 import ssl
 import asyncio
-import websockets
-import socketio
-
+import watchdog
 
 from cryptography.fernet import Fernet
 
 app = Flask(__name__)
-
-sio = socketio.AsyncClient()
 
 # framework = None
 
@@ -72,7 +68,7 @@ class CustomFormatter(argparse.HelpFormatter):
             prefix = 'usage: '
         # Return your custom usage string
         return f"{prefix}retrodeep [options] [command]\n\n"
-    
+
     def _format_action(self, action):
         parts = super()._format_action(action).split('\n')
         parts_filtered = [part for part in parts if not part.strip().startswith('{')]
@@ -88,7 +84,7 @@ class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         pass
 
 class MyTCPServer(socketserver.TCPServer):
-    allow_reuse_address = True 
+    allow_reuse_address = True
 
 def signal_handler(signal_received, frame):
     sys.exit(0)
@@ -101,8 +97,15 @@ if not os.path.exists(config_directory):
     os.makedirs(config_directory)
 
 def deploy_from_local(username, email, retrodeep_access_token):
+    """
+    Deploy to Retrodeep from a local dir.
+
+    :param username: Username of the Retrodeep user.
+    :param email: email of the Retrodeep user.
+    :param retrodeep_access_token: access token of Retrodeep user.
+    :return: Deployment message
+    """
     source = "local"
-    project_name = name_of_project_prompt(username, retrodeep_access_token)
 
     while True:
         directory_question = {
@@ -140,65 +143,17 @@ def deploy_from_local(username, email, retrodeep_access_token):
                     return
         else:
             print("> Invalid directory. Please enter a valid directory path.")
-
-    # framework = check_files_and_framework_local(absolute_path)
-    
-    # if framework != "html":
-    #     print(f"> Auto-detected Project Settings for {Style.BOLD}{framework}{Style.RESET}:")
-    #     # print(f"What's your {Style.BOLD}Build command{Style.RESET}:")
-
-    #     while True:
-    #         build_command_question = {
-    #             'type': 'input',
-    #             'name': 'build_command',
-    #             'message': "Enter your Build command:",
-    #             'default': 'npm run build'
-    #         }
-
-    #         build_command = prompt(build_command_question)['build_command']
-        
-    #         install_command_question = {
-    #             'type': 'input',
-    #             'name': 'install_command',
-    #             'message': 'Enter your Install command:',
-    #             'default': 'npm install'
-    #         }
-
-    #         install_command = prompt(install_command_question)['install_command']
-
-    #         build_output_question = {
-    #             'type': 'input',
-    #             'name': 'build_output',
-    #             'message': 'Enter your Output directory:',
-    #             'default': 'build'
-    #         }
-
-    #         build_output = prompt(build_output_question)['build_output']
-
-    #         # if not framework:
-    #         #     print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} has no {Style.BOLD}.html{Style.RESET} file.")
-    #         #     sys.exit(1)
-        
-    #         print(f"{Style.GREY}- Build Command: {build_command}{Style.RESET}")
-    #         print(f"{Style.GREY}- Install Command: {install_command}{Style.RESET}")
-    #         print(f"{Style.GREY}- Build Output Directory: {build_output}{Style.RESET}")
-
-    #         if not confirm_action(f"> {Style.CYAN}{Style.BOLD}Would you like to modify these settings?{Style.RESET}"):
-    #             break
+            
+    project_name = name_of_project_prompt(absolute_path, username, retrodeep_access_token)
 
     zip_file_path = compress_directory(absolute_path, project_name)
-    
+
     start_time = time.time()
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
-        # if framework == "html":
-        #     workflow = deploy_local(framework, zip_file_path, email, project_name, source, username, "./", retrodeep_access_token)
-        # else:
-        #     workflow = deploy_local(framework, zip_file_path, email, project_name, source, username, "./", retrodeep_access_token, install_command, build_command, build_output)
 
         workflow = deploy_local(zip_file_path, email, project_name, source, username, "./", retrodeep_access_token)
-        
+
         os.remove(zip_file_path)
-        print(f"workflow: {workflow}")
 
         deployment_params = listen_to_sse(workflow.get('deployment_id'))
 
@@ -220,9 +175,18 @@ def deploy_from_local(username, email, retrodeep_access_token):
 
 
 def deploy_from_repo(token, username, email, retrodeep_access_token):
+    """
+    Deploy to Retrodeep from a repository dir.
+
+    :param token: Source control token of the user.
+    :param username: Username of the Retrodeep user.
+    :param email: email of the Retrodeep user.
+    :param retrodeep_access_token: access token of Retrodeep user.
+    :return: Deployment message
+    """
     source = 'github'
     repos = list_user_repos(token)
-    
+
     if repos:
         questions = [
             {
@@ -291,7 +255,7 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         else:
             print("No recognizable project type found.")
             sys.exit(1)
-    
+
     if project_framework != "html":
         print(f"> Auto-detected Project Settings for {Style.BOLD}{project_framework}{Style.RESET}:")
 
@@ -304,7 +268,7 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
             }
 
             build_command = prompt(build_command_question)['build_command']
-        
+
             install_command_question = {
                 'type': 'input',
                 'name': 'install_command',
@@ -322,7 +286,7 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
             }
 
             build_output = prompt(build_output_question)['build_output']
-        
+
             print(f"{Style.GREY}- Build Command: {build_command}{Style.RESET}")
             print(f"{Style.GREY}- Install Command: {install_command}{Style.RESET}")
             print(f"{Style.GREY}- Build Output Directory: {build_output}{Style.RESET}")
@@ -340,16 +304,14 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         else:
             workflow = deploy(email, repo_name, branch_name, name_of_project,
                           directory, project_framework, source, username, retrodeep_access_token, install_command,build_command, build_output)
-            
-        print(workflow)
-            
+
         deployment_params = listen_to_sse(workflow.get('deployment_id'))
 
         if deployment_params == "Failed":
             spinner.ok("✘")
         else:
             spinner.ok("✔")
-    
+
     duration = round(time.time() - start_time, 2)
     if deployment_params == "Failed":
         print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
@@ -398,7 +360,7 @@ def init(debug=False):
             deploy_from_repo(token, username, email, retrodeep_access_token)
 
     except SystemExit as e:
-        # print(f"Exiting: {e}") 
+        # print(f"Exiting: {e}")
         # turn the above line off to not print error
         sys.exit(e)
     except Exception as e:
@@ -427,31 +389,32 @@ def deploy_using_flags(args):
         manage_user_session(username, token, email)
 
     absolute_path = os.path.abspath(args.directory)
-    
-    if not os.path.exists(absolute_path) and os.path.isdir(absolute_path):
+
+    if  os.path.exists(absolute_path) == False and os.path.isdir(absolute_path) == False:
         print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} does not exist.")
         sys.exit(1)
-    
+
     framework = check_files_and_framework_local(absolute_path)
-    
+
     if not framework:
         print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} has no {Style.BOLD}.html{Style.RESET} file.")
         sys.exit(1)
 
-
-    if check_project_exists(username, args.name, retrodeep_access_token):
-        print(f"> A project with the name {Style.BOLD}{args.name}{Style.RESET} already exists.")
-        project_name = generate_domain_name(args.name)
+    dir_name = os.path.basename(os.path.normpath(absolute_path))
+    
+    if check_project_exists(username, dir_name, retrodeep_access_token):
+        print(f"> A project with the name {Style.BOLD}{dir_name}{Style.RESET} already exists.")
+        project_name = generate_domain_name(dir_name)
     else:
-        project_name = args.name
+        project_name = dir_name
 
     print(f"> You are about to deploy the project {Style.BOLD}{project_name}{Style.RESET} from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
-    
+
     if not confirm_action(f"> {Style.CYAN}{Style.BOLD}Do you want to continue?{Style.RESET}"):
         print("> Operation canceled")
         sys.exit(0)
 
-    zip_file_path = compress_directory(absolute_path, args.name)
+    zip_file_path = compress_directory(absolute_path, dir_name)
 
     start_time = time.time()
 
@@ -464,7 +427,7 @@ def deploy_using_flags(args):
         else:
             spinner.ok("x")
             sys.exit(1)
-            
+
 
     # Check if workflow completed successfully
     with yaspin(text=f"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
@@ -500,17 +463,17 @@ def dev(args):
     else:
         port = int(args.port)
 
-    if not args.directory:
+    if not args.dir:
         dir = "."
     else:
-        dir = args.directory
+        dir = args.dir
 
     absolute_path = os.path.abspath(dir)
 
     if not os.path.exists(absolute_path):
         print(f"> The specified directory {Style.BOLD}{dir}{Style.RESET} does not exist.")
         sys.exit(1)
-    
+
     os.chdir(absolute_path)
     start_server(port, dir)
 
@@ -521,13 +484,13 @@ def start_server(port, dir_path):
                 print(f"> Hooray! Dev ready at {Style.BOLD}{Style.UNDERLINE}http://localhost:{port}{Style.RESET}")
                 webbrowser.open_new_tab(f"http://localhost:{port}")
                 httpd.serve_forever()
-            break  
+            break
         except OSError as e:
-            if e.errno in (98, 48): 
+            if e.errno in (98, 48):
                 print(f"> Port {port} is already in use")
-                port += 1  
+                port += 1
             else:
-                raise 
+                raise
         except KeyboardInterrupt:
             httpd.server_close()
             sys.exit(0)
@@ -599,9 +562,9 @@ def login_for_workflow():
             print("> Failed to authenticate or create user.")
             sys.exit(1)
 
-def show_help(parser):
-    parser.print_help()
-    sys.exit()
+# def show_help(parser):
+#     parser.print_help()
+#     sys.exit()
 
 
 def login_message(email):
@@ -613,7 +576,7 @@ def login_message(email):
 
 def list_projects(args):
     credentials = login_for_workflow()
-    
+
     username = credentials['username']
     email = credentials['email_address']
     retrodeep_access_token = credentials['retrodeep_access_token']
@@ -622,7 +585,7 @@ def list_projects(args):
 
 def list_projects_deployments(args):
     credentials = login_for_workflow()
-    
+
     username = credentials['username']
     email = credentials['email_address']
     retrodeep_access_token = credentials['retrodeep_access_token']
@@ -633,7 +596,7 @@ def list_projects_deployments(args):
 
 def delete_project(args):
     credentials = login_for_workflow()
-    
+
     username = credentials['username']
     retrodeep_access_token = credentials['retrodeep_access_token']
 
@@ -647,7 +610,7 @@ def delete_project(args):
             print(
                 f"You're about to remove the project: {Style.BOLD}{project_name}{Style.RESET}")
             print("This would permanently delete all its deployments and dependencies")
-            
+
             if confirm_action(f"> {Style.RED}{Style.BOLD}Are you sure?{Style.RESET}"):
                 delete_project_request(
                     username, args.project_name, retrodeep_access_token)
@@ -657,7 +620,195 @@ def delete_project(args):
         else:
             print(
                 f'> There are no deployments or projects matching {Style.BOLD}{project_name}{Style.RESET}.')
+            
+def print_custom_help():
+    custom_help_text = f"""
+ Usage: {Style.BOLD}retrodeep{Style.RESET} [options] [command]
 
+ Deploy. Build. Scale.
+
+ Options:
+ -h, --help            Displays usage information.
+ -d, --debug           Enable debug mode [default: off]
+ -v, --version         Display version no
+
+ Commands:
+ deploy                Deploy your project from a local directory or from a git repository
+ dev                   Start your project using a retrodeep dev server.
+ logs                  Display logs for a Retrodeep deployment.
+ login                 Log in to Retrodeep
+ logout                Log out of Retrodeep
+ projects              Manage your Retrodeep projects/app.
+ ls                    List all deployments of a project
+ rm                    Delete/Remove a project on Retrodeep
+ whoami                Shows the currently logged in user
+ help                  Displays help  
+"""
+    print(custom_help_text)
+
+def help_command(args):
+    if args.command == 'deploy':
+        print(
+          f"""
+ usage: {Style.BOLD}retrodeep deploy{Style.RESET} [project-name] [project-path]
+
+ Deploy your project from your local machine to Retrodeep. You can use "retrodeep"
+ to choose between deploying from your repository or local machine
+
+ options:
+ -h, --help            show this help message and exit
+ -d, --debug           Enable debug
+ -v, --version         show program's version number and exit
+
+ Examples:
+
+  - Deploy from local or reppository
+
+   $ retrodeep
+
+ - Deploy the current directory
+
+   $ retrodeep deploy .
+
+ - Deploy a custom path
+
+   $ retrodeep deploy /path/to/your/project
+
+ - Print Deployment URL to a file
+
+   $ retrodeep > deployment-url.txt
+	    """)
+    elif args.command == 'dev':
+        print(
+          f"""
+ Usage: {Style.BOLD}retrodeep dev{Style.RESET} [dir] [port]
+
+ Start your project using a retrodeep dev server.
+
+ Options:
+ -p, --port <port>        Specify custom port
+ -d, --dir  <dir_path>    Specify custom dir path
+ -h, --help               Display help
+
+ Examples:
+
+ - Start a dev server in the current directory
+
+   $ retrodeep dev
+
+ - Start a dev server in custom path
+
+   $ retrodeep dev --dir /path/to/your/project
+
+ - Start a dev server on a custom path e.g 3000
+
+   $ retrodeep dev --port 3000
+	    """)
+    elif args.command == 'logs':
+        print(
+          f"""
+ Usage: {Style.BOLD}retrodee logs{Style.RESET} [deployment URL | deployment ID]
+
+ Display logs for a Retrodeep deployment.
+
+ Options:
+ -h, --help            
+
+ Examples:
+
+ - Show logs for a deployment using deployment url
+
+   $ retrodeep logs example_deployment_url
+
+	    """)
+    elif args.command == 'login':
+        print(
+          f"""
+ Usage: {Style.BOLD}retrodeep login{Style.RESET}
+
+ Login to Retrodeep using Github Oauth.
+
+ Options:
+ -h, --help            
+
+	    """)
+    elif args.command == 'logout':
+        print(
+          f"""
+ Usage: {Style.BOLD}retrodeep logout{Style.RESET}
+
+Logout of Retrodeep on your local machine.
+
+ Options:
+ -h, --help            
+
+	    """)
+    elif args.command == 'projects':
+        print(
+          f"""
+ Usage: {Style.BOLD}retrodeep projects{Style.RESET}
+
+ Manage your Retrodeep projects
+
+ Options:
+ -h, --help            
+
+	    """)
+    elif args.command == 'ls':
+        print(
+          f"""
+ Usage: {Style.BOLD}retrodeep ls{Style.RESET} [project] 
+
+ List all deployments for a project/app.
+
+ Options:
+ -h, --help            
+
+ Examples:
+
+ - List all deployments for the project 'test-app'
+
+   $ retrodeep ls test-app
+
+	    """)
+    elif args.command == 'rm':
+        print(
+          f"""
+ Usage: {Style.BOLD}retrodeep rm{Style.RESET} [project] 
+
+ Remove a project deployment via ID or name.
+
+ Options:
+ -h, --help            
+
+ Examples:
+
+ - Remove a project deployment with name 'test-app'
+
+   $ retrodeep rm test-app
+
+ - Remove a project deployment with deploymentID 
+
+   $ retrodeep rm deploymentID 
+
+	    """)
+    elif args.command == 'whoami':
+        print(
+          f"""
+ Usage: {Style.BOLD}retrodeep whoami{Style.RESET}
+
+ Displays the username of the currently logged in user.
+
+ Options:
+ -h, --help            
+
+ Examples:
+
+ - List all deployments for the project 'test-app'
+
+   $ retrodeep ls test-app
+
+	    """)
 
 def whoami(args):
     credentials = login_for_workflow()
@@ -779,7 +930,7 @@ def add_new_project(username, email, project_name, domain_name, repo_name, retro
     response = requests.post(url, json=data, headers=headers)
 
     try:
-        response_data = response.json() 
+        response_data = response.json()
     except ValueError:
         response_data = None
 
@@ -838,10 +989,10 @@ def delete_project_request(username, project_name, retrodeep_access_token):
 def remove_https(url):
     # Regular expression to match and remove 'https://' if it exists
     pattern = r'^https?://(.+)$'
-    
+
     # Search for the pattern in the given URL and remove 'https://' or 'http://' if present
     match = re.match(pattern, url)
-    
+
     if match:
         # Return the URL without 'https://'
         return match.group(1)
@@ -857,7 +1008,22 @@ def fetch_and_display_logs(args):
 
     if not deployment_url:
         print("Error: Deployment URL is required.")
-        parser_deleteProjects.print_help()
+        print(
+          f"""
+ Usage: {Style.BOLD}retrodee logs{Style.RESET} [deployment URL | deployment ID]
+
+ Display logs for a Retrodeep deployment.
+
+ Options:
+ -h, --help            
+
+ Examples:
+
+ - Show logs for a deployment using deployment url
+
+   $ retrodeep logs example_deployment_url
+
+	    """)
         sys.exit(1)
 
     subdomain = remove_https(deployment_url)
@@ -872,6 +1038,8 @@ def fetch_and_display_logs(args):
         print(f"> Fetched logs for deployment {Style.BOLD}{logs.get('deployment_url')}{Style.RESET}")
         for log in logs.get('logs'):
             print(f"{Style.GREY}{log['timestamp']}{Style.RESET}  {log['message']}")
+    elif response.status_code == 404:
+        print(f"> A deployment with the url {Style.BOLD}{subdomain}{Style.RESET} does not exist.")
     else:
         print(f"Failed to retrieve logs: {response.status_code}")
 
@@ -976,14 +1144,14 @@ def deploy(email, repo_name, branch, project_name, directory, framework, source,
     url = f"{API_BASE_URL}/deploy"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
     data = {
-            'email': email, 
+            'email': email,
             'repo_name': repo_name,
             'branch': branch,
-            'project_name': project_name, 
-            'directory': directory, 
-            'username': username, 
-            'install_command': install_command, 
-            'build_command': build_command, 
+            'project_name': project_name,
+            'directory': directory,
+            'username': username,
+            'install_command': install_command,
+            'build_command': build_command,
             'build_output': build_output,
             'framework': framework,
             'source': source
@@ -999,20 +1167,20 @@ def deploy(email, repo_name, branch, project_name, directory, framework, source,
 
 def deploy_local(zip_file_path, email, project_name, source, username, directory, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
     url = f"{API_BASE_URL}/deploy"
-    headers = {'Authorization': f'Bearer {retrodeep_access_token}'}  
-    data = {'project_name': project_name, 'username': username, 'directory': directory, 'email': email, 'framework': framework, "source": source}
+    headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
+    data = {'project_name': project_name, 'username': username, 'directory': directory, 'email': email, "source": source}
 
 
     with open(zip_file_path, 'rb') as f:
         encoded_zip = base64.b64encode(f.read()).decode('utf-8')
-    
+
     data['encoded_file'] = encoded_zip
-    
-    try:   
+
+    try:
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 202:
             return response.json()
-    
+
     except requests.exceptions.RequestException as err:
         print(f"Request error: {err}")
     # return False
@@ -1050,24 +1218,24 @@ def get_repo_directory_contents(token, username, repo_name, branch_name, directo
     """
     # Format the GitHub API URL for the contents endpoint
     api_url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{directory_path}?ref={branch_name}"
-    
+
     # Include the token in the request headers for authentication
     headers = {'Authorization': f'token {token}'}
-    
+
     # Make the request to the GitHub API
     response = requests.get(api_url, headers=headers)
-    
+
     # Check if the request was successful
     if response.status_code == 200:
         directory_contents = response.json()
-        
+
         # Extract the name of each item in the directory
         filenames = [item['name'] for item in directory_contents]
         return filenames
     else:
         print(f"Failed to fetch directory contents: {response.status_code}")
         return []
-    
+
 def get_file_content(token, username, repo_name, branch_name, file_path):
     """
     Fetch the content of a file from a GitHub repository.
@@ -1081,24 +1249,24 @@ def get_file_content(token, username, repo_name, branch_name, file_path):
     """
     # Format the GitHub API URL for the contents endpoint, including the file path
     api_url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{file_path}?ref={branch_name}"
-    
+
     # Include the token in the request headers for authentication
     headers = {'Authorization': f'token {token}'}
-    
+
     # Make the request to the GitHub API
     response = requests.get(api_url, headers=headers)
-    
+
     # Check if the request was successful
     if response.status_code == 200:
         file_content = response.json()
-        
+
         # Decode the file content from base64
         decoded_content = base64.b64decode(file_content['content']).decode('utf-8')
         return decoded_content
     else:
         print(f"Failed to fetch file content: {response.status_code}")
         return None
-    
+
 def analyze_package_json(package_json_content):
     # This function would parse the package.json content and return a string indicating the project framework
     package_json = json.loads(package_json_content)
@@ -1114,7 +1282,7 @@ def name_of_project_prompt_repo(repo_name, username, retrodeep_access_token):
     repo_name = repo_name.replace(".", "-")
 
     if check_project_exists(username, repo_name, retrodeep_access_token):
-            repo_name = generate_domain_name(repo_name)
+        repo_name = generate_domain_name(repo_name)
 
     while True:
         # Prompt to choose user project
@@ -1135,15 +1303,24 @@ def name_of_project_prompt_repo(repo_name, username, retrodeep_access_token):
 
     return name_of_project
 
-def name_of_project_prompt(username, retrodeep_access_token):
+def name_of_project_prompt(absolute_path, username, retrodeep_access_token):
+
+    dir_name = os.path.basename(os.path.normpath(absolute_path))
+
+    if check_project_exists(username, dir_name, retrodeep_access_token):
+        dir_name = generate_domain_name(dir_name)
 
     while True:
         project_name_question = {
         'type': 'input',
         'name': 'project_name',
-        'message': 'Enter the project name (for subdomain):'
+        'message': f'Enter the project name (for subdomain):',
+        'default': f'{dir_name}'
     }
         project_name = prompt(project_name_question)['project_name']
+        
+        if not project_name:
+            project_name = dir_name
 
         # Check if project exists
         if check_project_exists(username, project_name, retrodeep_access_token):
@@ -1179,27 +1356,23 @@ def check_files_and_framework_local(directory):
     for file in os.listdir(directory):
         if file.endswith('.html'):
             return "html"
-    
+
     # Check for package.json file presence
     package_json_path = os.path.join(directory, 'package.json')
     if os.path.exists(package_json_path):
         with open(package_json_path) as f:
             package_json = json.load(f)
-            
+
             # Specify the key under which the framework is listed. For example: 'dependencies'
             framework_key = 'dependencies'  # Change this as needed
-            
+
             if framework_key in package_json:
                 # Assuming you want to check for specific frameworks listed under dependencies
-                frameworks = ['react', 'vue', 'next'] 
+                frameworks = ['react', 'vue', 'next']
                 for framework in frameworks:
                     if framework in package_json[framework_key]:
                         return framework
     return None
-
-# def compress_directory(source_dir, output_filename):
-#     shutil.make_archive(output_filename, 'zip', source_dir)
-#     return f"{output_filename}.zip"
 
 def compress_directory(source_dir, output_filename):
     # List all files in the directory to be compressed to determine the total for the progress bar
@@ -1208,9 +1381,9 @@ def compress_directory(source_dir, output_filename):
         for file in files:
             file_path = os.path.join(root, file)
             file_paths.append(file_path)
-    
+
     # Create a zip file with zip64 enabled
-    with zipfile.ZipFile(f"{output_filename}.zip", 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zipf, alive_bar(len(file_paths), title="Compressing and uploading files...") as bar:
+    with zipfile.ZipFile(f"{output_filename}.zip", 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zipf, alive_bar(len(file_paths), title=f"> Compressing and uploading files...") as bar:
         for file_path in file_paths:
             # Create a relative path for files to keep the directory structure
             relative_path = os.path.relpath(file_path, source_dir)
@@ -1236,31 +1409,37 @@ def Exit_gracefully(signum, frame):
 
 
 if __name__ == "__main__":
+    if "-h" in sys.argv or "--help" in sys.argv:
+        print_custom_help()
+        sys.exit()
+
     print(f"{Style.DIM}{Style.GREY}Retrodeep CLI {__version__}{Style.RESET}")
 
     signal.signal(signal.SIGINT, Exit_gracefully)
 
     # parser = argparse.ArgumentParser(prog='retrodeep')
-    parser = argparse.ArgumentParser(prog='retrodeep', 
+    parser = argparse.ArgumentParser(prog='retrodeep',
+                                     add_help=False,
                                      description='Deploy. Build. Scale',
                                      formatter_class=CustomFormatter)
     # Global flags
     parser.add_argument('-d', '--debug', action='store_true', help='Enable debug')
-    
-    subparsers = parser.add_subparsers(title="Commands", dest="command", help="")
     parser.add_argument('-v', '--version', action='version', version=f"{__version__}")
+
+    subparsers = parser.add_subparsers(title="Commands", dest="command", help="")
 
 
     # Deploy command
-    parser_deploy = subparsers.add_parser("deploy", help="Deploy your project from a local directory or from a git repository")    
-    parser_deploy.add_argument("name", help="Name of the project")
+    parser_deploy = subparsers.add_parser("deploy", help="Deploy your project from a local directory or from a git repository")
+    # parser_deploy.add_argument("name", help="Name of the project")
     parser_deploy.add_argument("directory",help="Directory path for deployment")
     parser_deploy.set_defaults(func=deploy_using_flags)
 
     # Dev command
-    parser_dev = subparsers.add_parser("dev", help="Test your project locally on your local machine")    
-    parser_dev.add_argument("port", help="Port to listen on")
-    parser_dev.add_argument("directory", help="Directory path for deployment")
+    parser_dev = subparsers.add_parser("dev", help="Test your project locally on your local machine")
+    parser_dev.add_argument("-p", "--port", default='3000', help="Port to listen on")
+    parser_dev.add_argument("-d", "--dir", nargs='?', default='.', help="Directory path for deployment")
+    # parser_dev.add_argument("-p", "--port", help="Port to listen on")
 
     parser_dev.set_defaults(func=dev)
 
@@ -1317,8 +1496,16 @@ if __name__ == "__main__":
     parser_whoami.set_defaults(func=whoami)
 
     # help
-    parser_help = subparsers.add_parser('help', help='Show help')
-    parser_help.set_defaults(func=lambda args: show_help(parser))
+    # parser_help = subparsers.add_parser('help', help='Show help')
+    # parser_help.set_defaults(func=lambda args: show_help(parser))
+
+    # help cmd command
+    parser_help_command = subparsers.add_parser(
+        "help", help="displays command from a command")
+    parser_help_command.add_argument(
+        "command",
+        help="Name of the command")
+    parser_help_command.set_defaults(func=help_command)
 
     args = parser.parse_args()
 

@@ -30,3 +30,4 @@ websockets
 python-socketio[client]
 python-engineio[asyncio]
 aiohttp
+watchdog
