@@ -125,7 +125,7 @@ def deploy_from_local(username, email, retrodeep_access_token):
                 print(f"{Style.RED} Error:{Style.RESET} The file size {Style.BOLD}{dir_size}{Style.RESET} exceeds the maximum allowed size of 1GB")
                 return
             # Check for the existence of .html file
-            if glob.glob(os.path.join(absolute_path, '*.html')) or glob.glob(os.path.join(absolute_path, 'package.json')) :
+            if glob.glob(os.path.join(absolute_path, '*.html')):
                 print(
                     f"> You are about to deploy from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
                 break
@@ -149,6 +149,7 @@ def deploy_from_local(username, email, retrodeep_access_token):
     zip_file_path = compress_directory(absolute_path, project_name)
 
     start_time = time.time()
+    
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
 
         workflow = deploy_local(zip_file_path, email, project_name, source, username, "./", retrodeep_access_token)
@@ -156,22 +157,22 @@ def deploy_from_local(username, email, retrodeep_access_token):
         os.remove(zip_file_path)
 
         deployment_params = listen_to_sse(workflow.get('deployment_id'))
-
-        if deployment_params == "Failed":
+        
+        if deployment_params.get("status") == "Failed":
             spinner.ok("✘")
+            print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
+            sys.exit(1)
         else:
             spinner.ok("✔")
 
     duration = round(time.time() - start_time, 2)
-    if deployment_params == "Failed":
-        print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
-    else:
-        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
-            spinner.ok("✔")
-        print(
-            f"> 🔗 Your website is live at: {Style.BOLD}{deployment_params['url2']}{Style.RESET}")
-        print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
-        print("> 🎉 Congratulations! Your project is now up and running.")
+    
+    with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
+        spinner.ok("✔")
+    print(
+        f"> 🔗 Your website is live at: {Style.BOLD}{deployment_params['url2']}{Style.RESET}")
+    print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
+    print("> 🎉 Congratulations! Your project is now up and running.")
 
 
 def deploy_from_repo(token, username, email, retrodeep_access_token):
@@ -364,8 +365,6 @@ def init(debug=False):
         # turn the above line off to not print error
         sys.exit(e)
     except Exception as e:
-        # This block will catch any other exceptions
-        # print("An error occurred:")
         traceback.print_exc()  # This will print the stack trace of the exception
         # turn the above line off to not print error
         sys.exit(1)  # Exit after printing the error details
@@ -393,6 +392,12 @@ def deploy_using_flags(args):
     if  os.path.exists(absolute_path) == False and os.path.isdir(absolute_path) == False:
         print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} does not exist.")
         sys.exit(1)
+    
+    if args.directory and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
+            dir_size = get_dir_size(absolute_path)
+            if dir_size > one_gb:
+                print(f"{Style.RED} Error:{Style.RESET} The file size {Style.BOLD}{dir_size}{Style.RESET} exceeds the maximum allowed size of 1GB")
+                sys.exit(1)
 
     framework = check_files_and_framework_local(absolute_path)
 
@@ -408,8 +413,12 @@ def deploy_using_flags(args):
     else:
         project_name = dir_name
 
-    print(f"> You are about to deploy the project {Style.BOLD}{project_name}{Style.RESET} from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
-
+    if glob.glob(os.path.join(absolute_path, '*.html')):
+        print(f"> You are about to deploy the project {Style.BOLD}{project_name}{Style.RESET} from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
+    else:
+        print("> There is no .html file in the provided path.")
+        sys.exit(1)
+    
     if not confirm_action(f"> {Style.CYAN}{Style.BOLD}Do you want to continue?{Style.RESET}"):
         print("> Operation canceled")
         sys.exit(0)
@@ -419,30 +428,28 @@ def deploy_using_flags(args):
     start_time = time.time()
 
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
+
         workflow = deploy_local(zip_file_path, email, project_name, source, username, "./", retrodeep_access_token)
+
         os.remove(zip_file_path)
 
-        if workflow.get('status') == 'completed':
-            spinner.ok("✔")
-        else:
-            spinner.ok("x")
+        deployment_params = listen_to_sse(workflow.get('deployment_id'))
+        
+        if deployment_params.get("status") == "Failed":
+            spinner.ok("✘")
+            print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
             sys.exit(1)
-
-
-    # Check if workflow completed successfully
-    with yaspin(text=f"{Style.BOLD}Finalizing Setup...{Style.RESET}", color="cyan") as spinner:
-        while not is_domain_up(workflow.get('url2')):
-            time.sleep(0.2)
-        spinner.ok("✔")
+        else:
+            spinner.ok("✔")
 
     duration = round(time.time() - start_time, 2)
-    with yaspin(text=f"{Style.BOLD}Deploy Succeeded [{duration}s]{Style.RESET}", color="cyan") as spinner:
+    
+    with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
         spinner.ok("✔")
     print(
-        f"> 🔗 Your website is live at: \033[1m\x1b]8;;{workflow.get('url2')}\x1b\\{workflow.get('url')}\x1b]8;;\x1b\\\033[0m")
-    print(f"> 🧪 Deployment: \033[1m\x1b]8;;{workflow.get('url3')}\x1b\\{workflow.get('url4')}\x1b]8;;\x1b\\\033[0m")
+        f"> 🔗 Your website is live at: {Style.BOLD}{deployment_params['url2']}{Style.RESET}")
+    print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
     print("> 🎉 Congratulations! Your project is now up and running.")
-    sys.exit(0)
 
 def dev(args):
     credentials = get_stored_credentials()
@@ -1125,15 +1132,12 @@ def listen_to_sse(deployment_id):
                     decoded_line = line.decode('utf-8')
                     if decoded_line.startswith('data:'):
                         data = decoded_line.split("data: ", 1)[1]
-                        if data == "Failed":
-                            # print("Deployment failed.")
-                            return "Failed"
-                        elif "log" in data:
-                            # Assuming log entries are wrapped in {"log": "message"}
-                            log_data = json.loads(data)
-                            print(log_data.get("log"))  # Print log messages continuously
-                        else:
-                            return json.loads(data)
+                        # # elif "log" in data:
+                        # #     # Assuming log entries are wrapped in {"log": "message"}
+                        # #     log_data = json.loads(data)
+                        # #     print(log_data.get("log"))  # Print log messages continuously
+                        # else:
+                        return json.loads(data)
     except Exception as e:
         print(f"An error occurred: {e}")
         return {"error": str(e)}
@@ -1177,7 +1181,7 @@ def deploy_local(zip_file_path, email, project_name, source, username, directory
     data['encoded_file'] = encoded_zip
 
     try:
-        response = requests.post(url, json=data, headers=headers)
+        response = requests.post(url, json=data, headers=headers, timeout=10)
         if response.status_code == 202:
             return response.json()
 
@@ -1383,7 +1387,7 @@ def compress_directory(source_dir, output_filename):
             file_paths.append(file_path)
 
     # Create a zip file with zip64 enabled
-    with zipfile.ZipFile(f"{output_filename}.zip", 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zipf, alive_bar(len(file_paths), title=f"> Compressing and uploading files...") as bar:
+    with zipfile.ZipFile(f"{output_filename}.zip", 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zipf, alive_bar(len(file_paths), title=f"> {Style.BOLD}Compressing and uploading files...{Style.RESET}") as bar:
         for file_path in file_paths:
             # Create a relative path for files to keep the directory structure
             relative_path = os.path.relpath(file_path, source_dir)
@@ -1495,10 +1499,6 @@ if __name__ == "__main__":
         "whoami", help="Shows the currently logged in user")
     parser_whoami.set_defaults(func=whoami)
 
-    # help
-    # parser_help = subparsers.add_parser('help', help='Show help')
-    # parser_help.set_defaults(func=lambda args: show_help(parser))
-
     # help cmd command
     parser_help_command = subparsers.add_parser(
         "help", help="displays command from a command")
@@ -1508,23 +1508,6 @@ if __name__ == "__main__":
     parser_help_command.set_defaults(func=help_command)
 
     args = parser.parse_args()
-
-    # if args.command == "dev":
-    #     if args.port and args.dir:
-    #         dev_with_flags(args)
-    #     else:
-    #         dev(args)
-
-    # if args.command == "deploy":
-    #     if args.name and args.directory:
-    #         deploy_using_flags(args)
-    #     else:
-    #         init(args)
-
-    # if hasattr(args, 'func'):
-    #     args.func(args)
-    # else:
-    #     parser.print_help()
 
     # Default action if no subcommand is provided
     if not hasattr(args, 'func'):
