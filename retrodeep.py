@@ -159,20 +159,24 @@ def deploy_from_local(username, email, retrodeep_access_token):
         deployment_params = listen_to_sse(workflow.get('deployment_id'))
         
         if deployment_params.get("status") == "Failed":
-            spinner.ok("✘")
-            print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
-            sys.exit(1)
+            spinner.fail("✘")
         else:
             spinner.ok("✔")
 
     duration = round(time.time() - start_time, 2)
     
-    with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
-        spinner.ok("✔")
-    print(
-        f"> 🔗 Your website is live at: {Style.BOLD}{deployment_params['url2']}{Style.RESET}")
-    print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
-    print("> 🎉 Congratulations! Your project is now up and running.")
+    if deployment_params.get("status") == "Failed":
+        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
+            spinner.fail("✘")
+        print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
+        sys.exit(1)
+    else:
+        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
+            spinner.ok("✔")
+        print(
+            f"> 🔗 Your website is live at: {Style.BOLD}{deployment_params['url2']}{Style.RESET}")
+        print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
+        print("> 🎉 Congratulations! Your project is now up and running.")
 
 
 def deploy_from_repo(token, username, email, retrodeep_access_token):
@@ -307,15 +311,19 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
                           directory, project_framework, source, username, retrodeep_access_token, install_command,build_command, build_output)
 
         deployment_params = listen_to_sse(workflow.get('deployment_id'))
-
-        if deployment_params == "Failed":
-            spinner.ok("✘")
+        
+        if deployment_params.get("status") == "Failed":
+            spinner.fail("✘")
         else:
             spinner.ok("✔")
 
     duration = round(time.time() - start_time, 2)
-    if deployment_params == "Failed":
+
+    if deployment_params.get("status") == "Failed":
+        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
+            spinner.fail("✘")
         print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
+        sys.exit(1)
     else:
         with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
             spinner.ok("✔")
@@ -324,6 +332,9 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
         print("> 🎉 Congratulations! Your project is now up and running.")
 
+
+
+    
 
 def init(debug=False):
     # Check for existing credentials
@@ -436,20 +447,22 @@ def deploy_using_flags(args):
         deployment_params = listen_to_sse(workflow.get('deployment_id'))
         
         if deployment_params.get("status") == "Failed":
-            spinner.ok("✘")
-            print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
-            sys.exit(1)
+            spinner.fail("✘")
         else:
             spinner.ok("✔")
 
-    duration = round(time.time() - start_time, 2)
-    
-    with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
-        spinner.ok("✔")
-    print(
-        f"> 🔗 Your website is live at: {Style.BOLD}{deployment_params['url2']}{Style.RESET}")
-    print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
-    print("> 🎉 Congratulations! Your project is now up and running.")
+    if deployment_params.get("status") == "Failed":
+        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
+            spinner.fail("✘")
+        print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
+        sys.exit(1)
+    else:
+        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
+            spinner.ok("✔")
+        print(
+            f"> 🔗 Your website is live at: {Style.BOLD}{deployment_params['url2']}{Style.RESET}")
+        print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
+        print("> 🎉 Congratulations! Your project is now up and running.")
 
 def dev(args):
     credentials = get_stored_credentials()
