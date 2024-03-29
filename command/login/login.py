@@ -18,6 +18,8 @@ import uuid
 from tabulate import tabulate
 from yaspin import yaspin
 from alive_progress import alive_bar
+from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
+
 
 AUTH_BASE_URL = "https://auth.retrodeep.com"
 
@@ -73,19 +75,29 @@ def wait_for_oauth_completion(session_id, timeout=300, interval=3):
 
     while time.time() - start_time < timeout:
         # Check if the OAuth process is completed and the token is ready
-        ready_response = requests.get(
-            f"{AUTH_BASE_URL}/is_ready?session_id={session_id}")
+        try:
+            ready_response = requests.get(
+                f"{AUTH_BASE_URL}/is_ready?session_id={session_id}")
 
-        if ready_response.status_code == 200 and ready_response.json().get('ready'):
-            # print("\n> Authentication completed.")
-            break
-        elif ready_response.status_code == 204:
-            # OAuth process not completed, wait for the next check
-            time.sleep(interval)
-        else:
-            # If any error occurs, raise an exception with the response
-            raise Exception(
-                f"Error checking OAuth completion: {ready_response.text}")
+            if ready_response.status_code == 200 and ready_response.json().get('ready'):
+                # print("\n> Authentication completed.")
+                break
+            elif ready_response.status_code == 204:
+                # OAuth process not completed, wait for the next check
+                time.sleep(interval)
+            else:
+                # If any error occurs, raise an exception with the response
+                raise Exception(
+                    f"Error checking OAuth completion: {ready_response.text}")
+        except HTTPError as http_err:
+            print(f"{Style.RED}Error:{Style.RESET} HTTP error occurred: {http_err} - {ready_response.status_code}")
+        except ConnectionError:
+            print(f"{Style.RED}Error:{Style.RESET} Connection error: Please check your internet connection.")
+        except Timeout:
+            print(f"{Style.RED}Error:{Style.RESET} Timeout error: The request timed out. Please try again later.")
+        except requests.exceptions.RequestException as err:
+            print(f"Request error: {err}")
+
         time.sleep(1)  # Adjust for Dot update frequency
     if time.time() - start_time >= timeout:
         raise TimeoutError("Authentication timeout reached.")
@@ -95,6 +107,10 @@ def login_message(email):
         f"> You have successfully authenticated with GitHub as {Style.BOLD}{email}{Style.RESET}")
     print(
         f"Welcome aboard! Enjoy your journey with Retrodeep! 🚀")
+    
+def login_message2(email):
+    print(
+        f"> You have successfully authenticated with GitHub as {Style.BOLD}{email}{Style.RESET}")
 
 def poll_for_token(session_id):
     while True:
@@ -104,7 +120,13 @@ def poll_for_token(session_id):
             if response.status_code == 200:
                 data = response.json()
                 if 'access_token' in data and 'github_username' in data and 'email' in data and 'retrodeep_access_token' in data:
-                    return data['access_token'], data['github_username'], data['email'], data['retrodeep_access_token']
+                    print(data.get('email'))
+                    return {
+                        "access_token": data.get('access_token'), 
+                        "username": data.get('github_username'), 
+                        "email_address": data.get('email'), 
+                        "retrodeep_access_token": data.get('retrodeep_access_token')
+                        }
                 elif 'error' in data:
                     raise Exception(data['error'])
             elif response.status_code == 204:
@@ -118,6 +140,8 @@ def poll_for_token(session_id):
             raise Exception(f"Request failed: {e}")
         time.sleep(5)
 
+
+
 def login(args):
     credentials = get_stored_credentials()
     if credentials:
@@ -130,17 +154,20 @@ def login(args):
         
         with yaspin(text=f"{Style.BOLD}Authenticating...{Style.RESET}", color="cyan") as spinner:
              # Initiate GitHub OAuth process and retrieve token and email
-            token, username, email, retrodeep_access_token = initiate_github_oauth()
-            if token:
+            credentials = initiate_github_oauth()
+
+            if credentials:
+                token = credentials.get("access_token")
+                username = credentials.get("username")
+                email = credentials.get("email_address") 
+                retrodeep_access_token = credentials.get("retrodeep_access_token")
                 spinner.text = f"{Style.BOLD}Authentication completed{Style.RESET}"
                 spinner.ok("✔")
-        # print("Authentication completed.")
-        if username and email and token and retrodeep_access_token:
-            login_message(email)
-            manage_user_session(username, token, email, retrodeep_access_token)
-        else:
-            print("> Failed to authenticate.")
-            sys.exit(1)
+                login_message(email)
+                manage_user_session(username, token, email, retrodeep_access_token)
+            else:
+                spinner.text = f"{Style.BOLD}Authentication failed{Style.RESET}"
+                spinner.fail("✘")
 
 def login_for_workflow():
     credentials = get_stored_credentials()
@@ -152,16 +179,19 @@ def login_for_workflow():
 
         with yaspin(text=f"{Style.BOLD}Authenticating...{Style.RESET}", color="cyan") as spinner:
              # Initiate GitHub OAuth process and retrieve token and email
-            token, username, email, retrodeep_access_token = initiate_github_oauth()
-            if token:
-                spinner.ok("✔")
+            credentials = initiate_github_oauth()
 
-        # If the user was successfully added or already exists, store their session
-        if username and email and token and retrodeep_access_token:
-            login_message(email)
-            manage_user_session(username, token, email, retrodeep_access_token)
-            credentials = get_stored_credentials()
-            return credentials
-        else:
-            print("> Failed to authenticate")
-            sys.exit(1)
+            if credentials:
+                token = credentials.get("access_token")
+                username = credentials.get("username")
+                email = credentials.get("email_address")
+                retrodeep_access_token = credentials.get("retrodeep_access_token")
+                spinner.text = f"{Style.BOLD}Authentication completed{Style.RESET}"
+                spinner.ok("✔")
+                login_message2(email)
+                manage_user_session(username, token, email, retrodeep_access_token)
+                return credentials
+            else:
+                spinner.text = f"{Style.BOLD}Authentication failed{Style.RESET}"
+                spinner.fail("✘")
+                sys.exit(1)

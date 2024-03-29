@@ -79,10 +79,6 @@ class Style:
     CYAN = '\033[36m'
     UNDERLINE = '\033[4m'
 
-API_BASE_URL = "https://api.retrodeep.com/v1"
-SSE_BASE_URL = "https://sse.retrodeep.com/stream"
-AUTH_BASE_URL = "https://auth.retrodeep.com"
-
 class CustomFormatter(argparse.HelpFormatter):
     def _format_usage(self, usage, actions, groups, prefix):
         if prefix is None:
@@ -117,15 +113,9 @@ config_directory = os.path.join(home, ".retrodeep")
 if not os.path.exists(config_directory):
     os.makedirs(config_directory)
 
-# def show_help(parser):
-#     parser.print_help()
-#     sys.exit()
-
-
 def Exit_gracefully(signum, frame):
     # exit(1)
     sys.exit(1)
-
 
 if __name__ == "__main__":
 

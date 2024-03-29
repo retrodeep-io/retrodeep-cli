@@ -19,10 +19,13 @@ import glob
 import randomname
 import zipfile
 from alive_progress import alive_bar
+from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
+
 
 from ..login.login import get_stored_credentials
 from ..login.login import initiate_github_oauth
 from ..login.login import manage_user_session
+from ..login.login import login_for_workflow
 
 # ANSI escape codes for colors and styles
 class Style:
@@ -284,13 +287,12 @@ def init(debug=False):
         username = credentials['username']
         email = credentials['email_address']
         retrodeep_access_token = credentials['retrodeep_access_token']
-
     else:
-        # If no credentials, initiate OAuth
-        print("> No existing Retrodeep credentials detected. Please authenticate")
-        print("> Authenticate with GitHub to proceed with Retrodeep:")
-        token, username, email, retrodeep_access_token = initiate_github_oauth()
-        manage_user_session(username, token, email)
+        credentials = login_for_workflow()
+        token = credentials.get("access_token")
+        username = credentials.get("username")
+        email = credentials.get("email")
+        retrodeep_access_token = credentials.get("retrodeep_access_token")
 
     try:
         print(f"Hi {username}!")
@@ -311,6 +313,10 @@ def init(debug=False):
             # Continue with the repo deployment process
             deploy_from_repo(token, username, email, retrodeep_access_token)
 
+    except ConnectionError:
+        print(f"{Style.RED}Error:{Style.RESET} Failed to deploy due to network issues. Please check your internet connection.")
+    except TimeoutError:
+        print(f"{Style.RED}Error:{Style.RESET} The deployment process timed out. Please try again later.")
     except SystemExit as e:
         # print(f"Exiting: {e}")
         # turn the above line off to not print error
@@ -325,18 +331,12 @@ def init(debug=False):
 def deploy_using_flags(args):
     source = "local"
 
-    credentials = get_stored_credentials()
-    if credentials:
-        token = credentials['access_token']
-        username = credentials['username']
-        email = credentials['email_address']
-        retrodeep_access_token = credentials['retrodeep_access_token']
-    else:
-        # If no credentials, initiate OAuth
-        print("> No existing Retrodeep credentials detected. Please authenticate")
-        print("> Authenticate with GitHub to proceed with Retrodeep:")
-        token, username, email, retrodeep_access_token = initiate_github_oauth()
-        manage_user_session(username, token, email)
+    credentials = login_for_workflow()
+    token = credentials['access_token']
+    username = credentials['username']
+    email = credentials['email_address']
+    retrodeep_access_token = credentials['retrodeep_access_token']
+
 
     absolute_path = os.path.abspath(args.directory)
 
@@ -467,7 +467,6 @@ def deploy_local(zip_file_path, email, project_name, source, username, directory
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
     data = {'project_name': project_name, 'username': username, 'directory': directory, 'email': email, "source": source}
 
-
     with open(zip_file_path, 'rb') as f:
         encoded_zip = base64.b64encode(f.read()).decode('utf-8')
 
@@ -477,9 +476,14 @@ def deploy_local(zip_file_path, email, project_name, source, username, directory
         response = requests.post(url, json=data, headers=headers, timeout=10)
         if response.status_code == 202:
             return response.json()
-
+    except HTTPError as http_err:
+        print(f"{Style.RED}Error:{Style.RESET} HTTP error occurred: {http_err} - {response.status_code}")
+    except ConnectionError:
+        print(f"{Style.RED}Error:{Style.RESET} Connection error: Please check your internet connection.")
+    except Timeout:
+        print(f"{Style.RED}Error:{Style.RESET} Timeout error: The request timed out. Please try again later.")
     except requests.exceptions.RequestException as err:
-        print(f"Request error: {err}")
+        print(f"{Style.RED}Error:{Style.RESET} Request error: {err}")
 
 def listen_to_sse(deployment_id):
     url = f"{SSE_BASE_URL}/{deployment_id}"  # Adjust the URL as needed based on your server configuration
@@ -496,6 +500,12 @@ def listen_to_sse(deployment_id):
                         # #     print(log_data.get("log"))  # Print log messages continuously
                         # else:
                         return json.loads(data)
+    except HTTPError as http_err:
+        print(f"{Style.RED}Error:{Style.RESET} HTTP error occurred: {http_err} - {response.status_code}")
+    except ConnectionError:
+        print(f"{Style.RED}Error:{Style.RESET} Connection error: Please check your internet connection.")
+    except Timeout:
+        print(f"{Style.RED}Error:{Style.RESET} Timeout error: The request timed out. Please try again later.")  
     except Exception as e:
         print(f"An error occurred: {e}")
         return {"error": str(e)}
@@ -520,18 +530,28 @@ def get_repo_directories(token, org_name, repo_name, branch_name, path="."):
     }
 
     url = f"https://api.github.com/repos/{org_name}/{repo_name}/contents/{path}?ref={branch_name}"
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    content = response.json()
+    
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        content = response.json()
 
-    directories = []
-    for item in content:
-        if item['type'] == 'dir':
-            subdir_path = f"{path}/{item['name']}" if path != "." else item['name']
-            directories.append(subdir_path)
-            directories.extend(get_repo_directories(
-                token, org_name, repo_name, branch_name, subdir_path))
-    return directories
+        directories = []
+        for item in content:
+            if item['type'] == 'dir':
+                subdir_path = f"{path}/{item['name']}" if path != "." else item['name']
+                directories.append(subdir_path)
+                directories.extend(get_repo_directories(
+                    token, org_name, repo_name, branch_name, subdir_path))
+        return directories
+    except HTTPError as http_err:
+        print(f"{Style.RED}Error:{Style.RESET} HTTP error occurred: {http_err} - {response.status_code}")
+    except ConnectionError:
+        print(f"{Style.RED}Error:{Style.RESET} Connection error: Please check your internet connection.")
+    except Timeout:
+        print(f"{Style.RED}Error:{Style.RESET} Timeout error: The request timed out. Please try again later.")
+    except requests.exceptions.RequestException as err:
+        print(f"Request error: {err}")
 
 def name_of_project_prompt_repo(repo_name, username, retrodeep_access_token):
 
@@ -662,6 +682,12 @@ def deploy(email, repo_name, branch, project_name, directory, framework, source,
         response = requests.post(url, json=data, headers=headers, timeout=10)  # Adjusted timeout
         if response.status_code == 202:  # Assuming 202 Accepted as the queueing response
             return response.json()
+    except HTTPError as http_err:
+        print(f"{Style.RED}Error:{Style.RESET} HTTP error occurred: {http_err} - {response.status_code}")
+    except ConnectionError:
+        print(f"{Style.RED}Error:{Style.RESET} Connection error: Please check your internet connection.")
+    except Timeout:
+        print(f"{Style.RED}Error:{Style.RESET} Timeout error: The request timed out. Please try again later.")
     except requests.exceptions.RequestException as err:
         print(f"Request error: {err}")
 
@@ -692,15 +718,21 @@ def check_project_exists(username, project_name, retrodeep_access_token):
     url = f"{API_BASE_URL}/projects/{project_name}"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
     data = {'username': username}
-    response = requests.get(url, json=data, headers=headers)
+    try:
+        response = requests.get(url, json=data, headers=headers)
 
-    if response.status_code == 200:
-        return True
-    elif response.status_code == 404:
-        return False
-    else:
-        raise Exception(
-            f"Failed to check project existence. Status Code: {response.status_code}")
+        if response.status_code == 200:
+            return True
+        elif response.status_code == 404:
+            return False
+    except HTTPError as http_err:
+        print(f"HTTP error occurred: {http_err} - {response.status_code}")
+    except ConnectionError:
+        print(f"{Style.RED}Error:{Style.RESET} Connection error: Please check your internet connection.")
+    except Timeout:
+        print(f"{Style.RED}Error:{Style.RESET} Timeout error: The request timed out. Please try again later.")
+    except requests.exceptions.RequestException as err:
+        print(f"{Style.RED}Error:{Style.RESET} Request error: {err}")
     
 def generate_domain_name(project_name):
     return f"{project_name}-{randomname.get_name(noun=('cats', 'astronomy', 'food'))}"

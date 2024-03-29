@@ -12,6 +12,8 @@ import sys, traceback
 from tabulate import tabulate
 from yaspin import yaspin
 from alive_progress import alive_bar
+from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
+
 
 from ..login.login import login_for_workflow
 
@@ -56,22 +58,27 @@ def fetch_and_display_logs(args):
         sys.exit(1)
 
     subdomain = remove_https(deployment_url)
-    print(subdomain)
 
     url = f"{API_BASE_URL}/deployments/{subdomain}/logs"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
 
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        logs = response.json()
-        print(f"> Fetched logs for deployment {Style.BOLD}{logs.get('deployment_url')}{Style.RESET}")
-        for log in logs.get('logs'):
-            print(f"{Style.GREY}{log['timestamp']}{Style.RESET}  {log['message']}")
-    elif response.status_code == 404:
-        print(f"> A deployment with the url {Style.BOLD}{subdomain}{Style.RESET} does not exist.")
-    else:
-        print(f"Failed to retrieve logs: {response.status_code}")
-
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            logs = response.json()
+            print(f"> Fetched logs for deployment {Style.BOLD}{logs.get('deployment_url')}{Style.RESET}")
+            for log in logs.get('logs'):
+                print(f"{Style.GREY}{log['timestamp']}{Style.RESET}  {log['message']}")
+        elif response.status_code == 404:
+            print(f"> A deployment with the url {Style.BOLD}{subdomain}{Style.RESET} does not exist.")
+    except HTTPError as http_err:
+        print(f"{Style.RED}Error:{Style.RESET} HTTP error occurred: {http_err} - {response.status_code}")
+    except ConnectionError:
+        print(f"{Style.RED}Error:{Style.RESET} Connection error: Please check your internet connection.")
+    except Timeout:
+        print(f"{Style.RED}Error:{Style.RESET} Timeout error: The request timed out. Please try again later.")
+    except requests.exceptions.RequestException as err:
+        print(f"{Style.RED}Error:{Style.RESET} Request error: {err}")
 
 def remove_https(url):
     # Regular expression to match and remove 'https://' if it exists
