@@ -136,8 +136,17 @@ def poll_for_token(session_id):
                     f"Server returned status code {response.status_code}. Response: {response.text}")
                 raise Exception(
                     f"Server returned status code {response.status_code}. Response: {response.text}")
+
+        except HTTPError as http_err:
+            print(f"{Style.RED}Error:{Style.RESET} HTTP error occurred: {http_err} - {response.status_code}")
+        except ConnectionError:
+            print(f"{Style.RED}Error:{Style.RESET} Connection error: Please check your internet connection.")
+        except Timeout:
+            print(f"{Style.RED}Error:{Style.RESET} Timeout error: The request timed out. Please try again later.")
+        except requests.exceptions.RequestException as err:
+            print(f"{Style.RED}Error:{Style.RESET} Request error: {err}")
         except requests.RequestException as e:
-            raise Exception(f"Request failed: {e}")
+            raise Exception(f"{Style.RED}Error:{Style.RESET} Request failed: {e}")
         time.sleep(5)
 
 
