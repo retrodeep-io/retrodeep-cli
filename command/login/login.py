@@ -19,6 +19,7 @@ from tabulate import tabulate
 from yaspin import yaspin
 from alive_progress import alive_bar
 from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
+# from PyInquirer import prompt
 
 
 AUTH_BASE_URL = "https://auth.retrodeep.com"
@@ -120,7 +121,6 @@ def poll_for_token(session_id):
             if response.status_code == 200:
                 data = response.json()
                 if 'access_token' in data and 'github_username' in data and 'email' in data and 'retrodeep_access_token' in data:
-                    print(data.get('email'))
                     return {
                         "access_token": data.get('access_token'), 
                         "username": data.get('github_username'), 
@@ -149,8 +149,6 @@ def poll_for_token(session_id):
             raise Exception(f"{Style.RED}Error:{Style.RESET} Request failed: {e}")
         time.sleep(5)
 
-
-
 def login(args):
     credentials = get_stored_credentials()
     if credentials:
@@ -160,6 +158,20 @@ def login(args):
     else:
         print("> No Credentials found. You are not currently logged in to retrodeep.")
         print("> Authenticate with GitHub to proceed with Retrodeep:")
+
+        # login_question = [
+        #     {
+        #         'type': 'list',
+        #         'name': 'login_method',
+        #         'message': 'Log in to Retrodeep:',
+        #         'choices': [
+        #             'Login using GitHub',
+        #             'Cancel',
+        #         ],
+        #     }
+        # ]
+
+        # answers = prompt(login_question)
         
         with yaspin(text=f"{Style.BOLD}Authenticating...{Style.RESET}", color="cyan") as spinner:
              # Initiate GitHub OAuth process and retrieve token and email

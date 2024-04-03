@@ -139,30 +139,6 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     """
     source = 'github'
     repos = list_user_repos(token)
-
-    # if repos:
-    #     questions = [
-    #         {
-    #             'type': 'list',
-    #             'name': 'repo',
-    #             'message': 'Which repo would you like to deploy?',
-    #             'choices': repos
-    #         }
-    #     ]
-    #     answers = prompt(questions)
-    #     repo_name = answers['repo']
-    # else:
-    #     print("You do not have any repositories")
-    #     sys.exit(1)
-
-    # user_choice = input("Enter 'p' to paginate or 's' to search for repositories: ").lower()
-
-    # if user_choice == 'p':
-    #     repo_name = display_repos_and_select(repos)
-    # elif user_choice == 's':
-    #     repo_name = search_and_select_repo(repos)
-    # else:
-    
     repo_name = display_repos_and_select(repos)
 
     # Fetch and select a branch from the repository
