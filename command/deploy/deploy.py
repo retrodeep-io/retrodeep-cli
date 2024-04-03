@@ -20,6 +20,7 @@ import randomname
 import zipfile
 from alive_progress import alive_bar
 from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
+from math import ceil
 
 
 from ..login.login import get_stored_credentials
@@ -139,20 +140,30 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     source = 'github'
     repos = list_user_repos(token)
 
-    if repos:
-        questions = [
-            {
-                'type': 'list',
-                'name': 'repo',
-                'message': 'Which repo would you like to deploy?',
-                'choices': repos
-            }
-        ]
-        answers = prompt(questions)
-        repo_name = answers['repo']
-    else:
-        print("You do not have any repositories")
-        sys.exit(1)
+    # if repos:
+    #     questions = [
+    #         {
+    #             'type': 'list',
+    #             'name': 'repo',
+    #             'message': 'Which repo would you like to deploy?',
+    #             'choices': repos
+    #         }
+    #     ]
+    #     answers = prompt(questions)
+    #     repo_name = answers['repo']
+    # else:
+    #     print("You do not have any repositories")
+    #     sys.exit(1)
+
+    # user_choice = input("Enter 'p' to paginate or 's' to search for repositories: ").lower()
+
+    # if user_choice == 'p':
+    #     repo_name = display_repos_and_select(repos)
+    # elif user_choice == 's':
+    #     repo_name = search_and_select_repo(repos)
+    # else:
+    
+    repo_name = display_repos_and_select(repos)
 
     # Fetch and select a branch from the repository
     branches = list_repo_branches(token, repo_name, username)
@@ -511,6 +522,109 @@ def listen_to_sse(deployment_id):
         return {"error": str(e)}
     except KeyboardInterrupt:
         print("Operation Canceled.")
+
+def paginate_repos(repos, page, per_page=10):
+    start = (page - 1) * per_page
+    end = start + per_page
+    return repos[start:end]
+
+def display_repos_and_select(repos):
+    page = 1
+    per_page = 10
+    total_items = len(repos)
+    selected_repo = None
+
+    while True:
+        # Calculate start and end indices for the current page
+        start_index = (page - 1) * per_page + 1
+        end_index = start_index + per_page - 1
+        if end_index > total_items:
+            end_index = total_items
+
+        paginated_repos = paginate_repos(repos, page, per_page)
+        for i, repo in enumerate(paginated_repos, start=1):
+            print(f"{Style.GREY}{i}{Style.RESET} {repo}")
+        
+        print(f"{Style.GREY}Showing Items {start_index}-{end_index} of {total_items}{Style.RESET}")
+
+        repo_choice_question = {
+            'type': 'input',
+            'name': 'repo_choice',
+            'message': 'Enter a number to select a repo, <n> for next, <p> for previous, <q> to quit or <s> to search:',
+        }
+        user_input = prompt(repo_choice_question)['repo_choice']
+        user_input = user_input.lower()
+        
+        if user_input.isdigit():
+            repo_index = int(user_input) - 1
+            if repo_index >= 0 and repo_index < len(paginated_repos):
+                selected_repo = paginated_repos[repo_index]
+                print(f"> You have selected the repository: {Style.BOLD}{selected_repo}{Style.RESET}")
+                break
+            else:
+                print("Invalid selection. Please try again.")
+        elif user_input == 'n':
+            if page * per_page < len(repos):
+                page += 1
+            else:
+                print("You are on the last page.")
+        elif user_input == 'p':
+            if page > 1:
+                page -= 1
+            else:
+                print("You are on the first page.")
+        elif user_input == 's':
+            selected_repo = search_and_select_repo(repos)
+            break
+        elif user_input == 'q':
+            break
+
+    return selected_repo
+
+
+def search_and_select_repo(repos):
+    while True:
+        # search_term = input("Enter a search term (or leave empty to see all repositories): ")
+
+        search_repo_question = {
+            'type': 'input',
+            'name': 'search_repo_choice',
+            'message': 'Enter a search term (or leave empty to see all repositories):',
+        }
+
+        search_term = prompt(search_repo_question)['search_repo_choice']
+        
+        filtered_repos = [repo for repo in repos if search_term.lower() in repo.lower()] if search_term else None
+        
+        if not filtered_repos:
+            print("No repositories found. Try again.")
+            continue
+
+        for i, repo in enumerate(filtered_repos, start=1):
+            print(f"{Style.GREY}{i}{Style.RESET} {repo}")
+        
+        # repo_input = input("Enter a number to select a repo, or 'r' to refine your search: ").lower()
+
+        search_repo_question2 = {
+            'type': 'input',
+            'name': 'search_repo_choice2',
+            'message': 'Enter a search term (or leave empty to see all repositories):',
+        }
+
+        repo_input = prompt(search_repo_question2)['search_repo_choice2']
+
+        if repo_input.isdigit():
+            repo_index = int(repo_input) - 1
+            if 0 <= repo_index < len(filtered_repos):
+                selected_repo = filtered_repos[repo_index]
+                print(f"You have selected the repository: {Style.BOLD}{selected_repo}{Style.RESET}")
+                return selected_repo
+            else:
+                print("> Invalid selection. Please try again.")
+        elif repo_input == 'r':
+            continue
+        else:
+            print("> Invalid input. Please try again or refine your search.")
 
 def list_user_repos(token):
     g = Github(token)
