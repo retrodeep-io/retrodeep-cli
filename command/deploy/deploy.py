@@ -70,7 +70,7 @@ def deploy_from_local(username, email, retrodeep_access_token):
         if directory and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
             dir_size = get_dir_size(absolute_path)
             if dir_size > one_gb:
-                print(f"{Style.RED} Error:{Style.RESET} The file size {Style.BOLD}{dir_size}{Style.RESET} exceeds the maximum allowed size of 1GB")
+                print(f"{Style.RED}Error:{Style.RESET} The file size {Style.BOLD}{dir_size}{Style.RESET} exceeds the maximum allowed size of 1GB")
                 return
             # Check for the existence of .html file
             if glob.glob(os.path.join(absolute_path, '*.html')):

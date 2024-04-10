@@ -43,15 +43,21 @@ def get_stored_credentials():
       
 def initiate_github_oauth():
     session_id = str(uuid.uuid4())
+    
+    print(f"> {Style.UNDERLINE}{AUTH_BASE_URL}/login?session_id={session_id}{Style.RESET}")
+    
+    with yaspin(text=f"{Style.BOLD}Authenticating with GitHub...{Style.RESET}", color="cyan") as spinner:
+        webbrowser.open(
+            f"{AUTH_BASE_URL}/login?session_id={session_id}")
 
-    webbrowser.open(
-        f"{AUTH_BASE_URL}/login?session_id={session_id}")
+        time.sleep(3)
 
-    time.sleep(3)
+        wait_for_oauth_completion(session_id)
 
-    wait_for_oauth_completion(session_id)
-
-    return poll_for_token(session_id)
+        polled_token = poll_for_token(session_id)
+        spinner.text = f"{Style.BOLD}Authentication completed{Style.RESET}"
+        spinner.ok("✔")
+    return polled_token
     
 def manage_user_session(username, access_token, email_address, retrodeep_access_token):
     app_dir = Path.home() / '.retrodeep'
@@ -158,37 +164,19 @@ def login(args):
     else:
         print("> No Credentials found. You are not currently logged in to retrodeep.")
         print("> Authenticate with GitHub to proceed with Retrodeep:")
-
-        # login_question = [
-        #     {
-        #         'type': 'list',
-        #         'name': 'login_method',
-        #         'message': 'Log in to Retrodeep:',
-        #         'choices': [
-        #             'Login using GitHub',
-        #             'Cancel',
-        #         ],
-        #     }
-        # ]
-
-        # answers = prompt(login_question)
         
-        with yaspin(text=f"{Style.BOLD}Authenticating...{Style.RESET}", color="cyan") as spinner:
-             # Initiate GitHub OAuth process and retrieve token and email
-            credentials = initiate_github_oauth()
+            # Initiate GitHub OAuth process and retrieve token and email
+        credentials = initiate_github_oauth()
 
-            if credentials:
-                token = credentials.get("access_token")
-                username = credentials.get("username")
-                email = credentials.get("email_address") 
-                retrodeep_access_token = credentials.get("retrodeep_access_token")
-                spinner.text = f"{Style.BOLD}Authentication completed{Style.RESET}"
-                spinner.ok("✔")
-                login_message(email)
-                manage_user_session(username, token, email, retrodeep_access_token)
-            else:
-                spinner.text = f"{Style.BOLD}Authentication failed{Style.RESET}"
-                spinner.fail("✘")
+        if credentials:
+            token = credentials.get("access_token")
+            username = credentials.get("username")
+            email = credentials.get("email_address") 
+            retrodeep_access_token = credentials.get("retrodeep_access_token")
+            login_message(email)
+            manage_user_session(username, token, email, retrodeep_access_token)
+        else:
+            print(f"{Style.RED}Error:{Style.RESET} {Style.BOLD}Authentication failed{Style.RESET}")
 
 def login_for_workflow():
     credentials = get_stored_credentials()
@@ -198,21 +186,16 @@ def login_for_workflow():
         print("> No Credentials found. You are not currently logged in to Retrodeep.")
         print("> Authenticate with GitHub to proceed with Retrodeep:")
 
-        with yaspin(text=f"{Style.BOLD}Authenticating...{Style.RESET}", color="cyan") as spinner:
              # Initiate GitHub OAuth process and retrieve token and email
-            credentials = initiate_github_oauth()
+        credentials = initiate_github_oauth()
 
-            if credentials:
-                token = credentials.get("access_token")
-                username = credentials.get("username")
-                email = credentials.get("email_address")
-                retrodeep_access_token = credentials.get("retrodeep_access_token")
-                spinner.text = f"{Style.BOLD}Authentication completed{Style.RESET}"
-                spinner.ok("✔")
-                login_message2(email)
-                manage_user_session(username, token, email, retrodeep_access_token)
-                return credentials
-            else:
-                spinner.text = f"{Style.BOLD}Authentication failed{Style.RESET}"
-                spinner.fail("✘")
-                sys.exit(1)
+        if credentials:
+            token = credentials.get("access_token")
+            username = credentials.get("username")
+            email = credentials.get("email_address")
+            retrodeep_access_token = credentials.get("retrodeep_access_token")
+            login_message2(email)
+            manage_user_session(username, token, email, retrodeep_access_token)
+            return credentials
+        else:
+            print(f"{Style.RED}Error:{Style.RESET} {Style.BOLD}Authentication failed{Style.RESET}")
