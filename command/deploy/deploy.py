@@ -309,7 +309,7 @@ def init(debug=False):
         # turn the above line off to not print error
         sys.exit(e)
     except Exception as e:
-        traceback.print_exc()  # This will print the stack trace of the exception
+        # traceback.print_exc()  # This will print the stack trace of the exception
         # turn the above line off to not print error
         sys.exit(1)  # Exit after printing the error details
     except:
