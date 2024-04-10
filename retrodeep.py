@@ -67,7 +67,7 @@ app = Flask(__name__)
 
 # framework = None
 
-__version__ = "0.0.1-beta"
+__version__ = "1.0.0-beta.1"
 
 # ANSI escape codes for colors and styles
 class Style:
