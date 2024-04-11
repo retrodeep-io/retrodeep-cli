@@ -63,11 +63,9 @@ from command.help.help import help_command
 
 from cryptography.fernet import Fernet
 
-app = Flask(__name__)
+from retrodeep.version import __version__
 
 # framework = None
-
-__version__ = "1.0.0-beta.1"
 
 # ANSI escape codes for colors and styles
 class Style:
