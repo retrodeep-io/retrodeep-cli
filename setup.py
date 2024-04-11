@@ -24,7 +24,7 @@ setup(
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     author="Ayomide Alaka-Yusuf",
-    license="Your License",
+    license="MIT",
     url="https://github.com/retrodeep-io/retrodeep-cli",
     project_urls={
         "Documentation": "https://docs.retrodeep.com",
@@ -45,11 +45,12 @@ setup(
         "randomname>=0.2.1",
         "tabulate>=0.9.0",
         "alive-progress>=3.1.5",
+        "setuptools"
         "pip"
     ],
     entry_points="""
         [console_scripts]
-        retrodeep=retrodeep.retrodeep:main  # Adjust the entry point to match your project structure
+        retrodeep=retrodeep.retrodeep:main
     """,
     extras_require={
         "test": [
