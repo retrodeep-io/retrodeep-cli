@@ -12,8 +12,6 @@ from ..deploy.deploy import confirm_action
 
 from cryptography.fernet import Fernet
 
-# framework = None
-
 # ANSI escape codes for colors and styles
 class Style:
     GREY = '\033[90m'
