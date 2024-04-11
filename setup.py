@@ -52,7 +52,7 @@ setup(
         "charset-normalizer>=3.3.2",
         "idna>=3.7",
         "cffi>=1.16.0",
-        "cryptography>=42.0.5",
+        "cryptography==2.8",
         "Deprecated>=1.2.14",
         "pycparser>=2.22",
         "PyJWT>=2.8.0",
