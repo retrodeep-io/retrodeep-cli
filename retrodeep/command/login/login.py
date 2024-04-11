@@ -1,26 +1,14 @@
 import requests
-from flask import Flask, request
 import webbrowser
-from github import Github
-# from PyInquirer import prompt
 from questionary import prompt
-import git
 import json
-import base64
-from nacl import encoding, public
 import time
-from tqdm import tqdm
-from datetime import datetime, timedelta
 from pathlib import Path
-from clint.textui import progress
 import sys
 import uuid
-from tabulate import tabulate
 from yaspin import yaspin
-from alive_progress import alive_bar
 from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
 # from PyInquirer import prompt
-
 
 AUTH_BASE_URL = "https://auth.retrodeep.com"
 

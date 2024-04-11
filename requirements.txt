@@ -1,22 +1,12 @@
 ###### Requirements without Version Specifiers ######
-flask
 requests
+urllib3
 PyGithub
-PyInquirer
-GitPython
-
-argparse
-
-tqdm
 datetime
-pathlib
-clint
-
 questionary
-requests_oauthlib 
 uuid
 yaspin
 randomname
 tabulate
 alive-progress
-websockets
+setuptools

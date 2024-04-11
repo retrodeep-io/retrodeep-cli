@@ -1,19 +1,9 @@
 import requests
-from flask import Flask, request
-import webbrowser
-import threading
-from github import Github
-# from PyInquirer import prompt
 from questionary import prompt
-from nacl import encoding, public
-from tqdm import tqdm
 from datetime import datetime, timedelta
 from pathlib import Path
 from clint.textui import progress
-import sys, traceback
-from tabulate import tabulate
-from yaspin import yaspin
-from alive_progress import alive_bar
+import sys
 
 from ..login.login import login_for_workflow
 
@@ -22,11 +12,7 @@ from ..deploy.deploy import confirm_action
 
 from cryptography.fernet import Fernet
 
-app = Flask(__name__)
-
 # framework = None
-
-__version__ = "0.0.1 Pre-Release"
 
 # ANSI escape codes for colors and styles
 class Style:

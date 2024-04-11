@@ -1,22 +1,17 @@
 import requests
-from flask import Flask, request
 import webbrowser
 import threading
 from github import Github
-# from PyInquirer import prompt
 from questionary import prompt
 import git
 import json
 import base64
-from nacl import encoding, public
 import argparse
 import os
 import shutil
 import time
-from tqdm import tqdm
 from datetime import datetime, timedelta
 from pathlib import Path
-from clint.textui import progress
 import random
 import string
 import itertools
@@ -36,8 +31,6 @@ import randomname
 import zipfile
 from alive_progress import alive_bar
 import ssl
-import asyncio
-import watchdog
 
 from command.login.login import login
 
@@ -63,7 +56,7 @@ from command.help.help import help_command
 
 from cryptography.fernet import Fernet
 
-from retrodeep.version import __version__
+from version import __version__
 
 # framework = None
 

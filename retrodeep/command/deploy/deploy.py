@@ -1,19 +1,14 @@
 import requests
-from flask import Flask, request
 from github import Github
-# from PyInquirer import prompt
 from questionary import prompt
 import json
 import base64
-from nacl import encoding, public
 import os
 import time
-from tqdm import tqdm
 from datetime import datetime, timedelta
 from pathlib import Path
 from clint.textui import progress
 import sys, traceback
-from tabulate import tabulate
 from yaspin import yaspin
 import glob
 import randomname

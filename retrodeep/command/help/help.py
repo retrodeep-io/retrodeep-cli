@@ -1,16 +1,7 @@
-import requests
-from flask import Flask, request
-from github import Github
-# from PyInquirer import prompt
 from questionary import prompt
-from nacl import encoding, public
-from tqdm import tqdm
 from datetime import datetime, timedelta
 from pathlib import Path
-from clint.textui import progress
-from tabulate import tabulate
-from yaspin import yaspin
-from alive_progress import alive_bar
+
 
 __version__ = "0.0.1 Pre-Release"
 

@@ -1,18 +1,6 @@
-from github import Github
-# from PyInquirer import prompt
-from questionary import prompt
-from nacl import encoding, public
 import os
 import shutil
-from tqdm import tqdm
-from datetime import datetime, timedelta
-from pathlib import Path
-from clint.textui import progress
 import sys
-from tabulate import tabulate
-from yaspin import yaspin
-from alive_progress import alive_bar
-
 
 class Style:
     GREY = '\033[90m'

@@ -1,43 +1,12 @@
-import requests
-from flask import Flask, request
 import webbrowser
-import threading
 from github import Github
 # from PyInquirer import prompt
 from questionary import prompt
-import git
-import json
-import base64
-from nacl import encoding, public
-import argparse
 import os
-import shutil
-import time
-from tqdm import tqdm
-from datetime import datetime, timedelta
-from pathlib import Path
-from clint.textui import progress
-import random
-import string
-import itertools
-import subprocess
-import re
-import signal
 import sys, traceback
-import waitress
-import secrets
-import uuid
-from tabulate import tabulate
-from yaspin import yaspin
-import glob
 import http.server
 import socketserver
-import randomname
-import zipfile
-from alive_progress import alive_bar
 import ssl
-import asyncio
-import watchdog
 
 from ..login.login import get_stored_credentials
 from ..login.login import initiate_github_oauth
