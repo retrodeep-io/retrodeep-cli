@@ -31,7 +31,7 @@ setup(
         "Source code": "https://github.com/retrodeep-io/retrodeep-cli",
         "Issues": "https://github.com/retrodeep-io/retrodeep-cli/issues",
     },
-    packages=find_packages(exclude=("tests",)),
+    packages=find_packages(),
     package_data={"retrodeep": ["templates/*.html"]},  # Adjust based on your actual data files
     include_package_data=True,
     python_requires=">=3.9",
