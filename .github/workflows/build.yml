@@ -1,0 +1,39 @@
+on:
+  push:
+    branches-ignore:
+      - main
+    tags:
+      - "v*"
+jobs:
+  build_and_release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install PyInstaller
+
+      - name: Build the CLI executable
+        run: |
+          pyinstaller --onefile --name retrodeep ./retrodeep/retrodeep.py
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          name: Release ${{ github.sha }}
+          body: |
+            Build artifacts: macos, linux
+          files: |
+            dist/*
+
+      - name: Final clean up
+        run: rm -rf dist build __pycache__
