@@ -18,12 +18,12 @@ def logout(args):
     credentials_path = os.path.join(retrodeep_dir, 'credentials.json')
     
     if os.path.isfile(credentials_path):
-        try:
-            with yaspin(text=f"{Style.BOLD}Logging out{Style.RESET}", color="cyan") as spinner:
+        with yaspin(text=f"{Style.BOLD}Logging out...{Style.RESET}", color="cyan") as spinner:
+          try:
               os.remove(credentials_path)
-              spinner.ok("> Log out successful!")
-        except Exception as e:
-              spinner.fail(f"> Error during logout: {e}")
+              spinner.ok("✔ Log out successful!")
+          except Exception as e:
+              spinner.fail(f"✘ Error during logout: {e}")
               sys.exit(1)
     else:
         print("> You are not currently logged in to retrodeep.")
