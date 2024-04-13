@@ -58,15 +58,20 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/download-artifact@v3
+        with:
+          path: dist/
+
+      - name: List files in dist
+        run: ls -alh dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
-        env:
-          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        # env:
+        #   RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
           files: |
             dist/*
-          token: RELEASE_TOKEN
+          token: ${{ secrets.RELEASE_TOKEN }}
 
   cleanup:
     needs: [build, release]
