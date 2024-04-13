@@ -1,41 +1,80 @@
+name: Build and Release
+
 on:
   push:
-    branches-ignore:
-      - main
     tags:
       - "v*"
+
 jobs:
-  build_and_release:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+            python-version: 3.9
+            binary-name: retrodeep-linux-amd64
+          - os: ubuntu-latest
+            arch: arm64
+            python-version: 3.9
+            binary-name: retrodeep-linux-arm64
+          - os: macos-latest
+            arch: x64
+            python-version: 3.9
+            binary-name: retrodeep-macos-x64
+          - os: macos-latest
+            arch: arm64
+            python-version: 3.9
+            binary-name: retrodeep-macos-arm64
+
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.9"
 
-      - name: Install Dependencies
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install PyInstaller
 
-      - name: Build the CLI executable
+      - name: Build binary with PyInstaller
         run: |
-          pyinstaller --onefile --name retrodeep ./retrodeep/retrodeep.py
+          pyinstaller --onefile --name ${{ matrix.binary-name }} retrodeep/retrodeep.py
 
-      - name: Create GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.binary-name }}
+          path: dist/${{ matrix.binary-name }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v3
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref }}
-          name: Release ${{ github.sha }}
-          body: |
-            Build artifacts: macos, linux
           files: |
             dist/*
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  cleanup:
+    needs: [build, release]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Clean up build artifacts
+        run: rm -rf dist
+        shell: bash
 
       - name: Final clean up
-        run: rm -rf dist build __pycache__
+        run: echo "Cleanup completed successfully."
