@@ -31,7 +31,7 @@ from retrodeep.command.help.help import help_command
 
 from cryptography.fernet import Fernet
 
-from version import __version__
+from retrodeep.version import __version__
 
 # framework = None
 
