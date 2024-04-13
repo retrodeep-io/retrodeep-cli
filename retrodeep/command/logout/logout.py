@@ -1,6 +1,7 @@
 import os
 import shutil
 import sys
+from yaspin import yaspin
 
 class Style:
     GREY = '\033[90m'
@@ -13,12 +14,16 @@ class Style:
 
 def logout(args):
     retrodeep_dir = os.path.join(os.path.expanduser('~'), '.retrodeep')
-    if os.path.exists(retrodeep_dir):
+
+    credentials_path = os.path.join(retrodeep_dir, 'credentials.json')
+    
+    if os.path.isfile(credentials_path):
         try:
-            shutil.rmtree(retrodeep_dir)
-            print("> Log out successful!")
+            with yaspin(text=f"{Style.BOLD}Logging out{Style.RESET}", color="cyan") as spinner:
+            os.remove(credentials_path)
+            spinner.ok("> Log out successful!")
         except Exception as e:
-            print(f"Error during logout: {e}")
+            spinner.fail(f"> Error during logout: {e}")
             sys.exit(1)
     else:
         print("> You are not currently logged in to retrodeep.")
