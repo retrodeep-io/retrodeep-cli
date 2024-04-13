@@ -2,7 +2,6 @@ import requests
 from questionary import prompt
 from datetime import datetime, timedelta
 from pathlib import Path
-from clint.textui import progress
 import sys
 
 from ..login.login import login_for_workflow

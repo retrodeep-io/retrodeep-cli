@@ -7,7 +7,6 @@ import os
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from clint.textui import progress
 import sys, traceback
 from yaspin import yaspin
 import glob
