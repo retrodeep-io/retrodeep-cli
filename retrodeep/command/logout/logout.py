@@ -20,10 +20,10 @@ def logout(args):
     if os.path.isfile(credentials_path):
         try:
             with yaspin(text=f"{Style.BOLD}Logging out{Style.RESET}", color="cyan") as spinner:
-            os.remove(credentials_path)
-            spinner.ok("> Log out successful!")
+              os.remove(credentials_path)
+              spinner.ok("> Log out successful!")
         except Exception as e:
-            spinner.fail(f"> Error during logout: {e}")
-            sys.exit(1)
+              spinner.fail(f"> Error during logout: {e}")
+              sys.exit(1)
     else:
         print("> You are not currently logged in to retrodeep.")

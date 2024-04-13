@@ -7,27 +7,27 @@ import http.server
 import socketserver
 import ssl
 
-from command.login.login import login
+from .command.login.login import login
 
-from command.logout.logout import logout
+from .command.logout.logout import logout
 
-from command.dev.dev import dev
+from .command.dev.dev import dev
  
-from command.deploy.deploy import deploy_using_flags 
-from command.deploy.deploy import init 
+from .command.deploy.deploy import deploy_using_flags 
+from .command.deploy.deploy import init 
 
-from command.logs.logs import fetch_and_display_logs
+from .command.logs.logs import fetch_and_display_logs
 
-from command.projects.projects import list_projects
+from .command.projects.projects import list_projects
 
-from command.ls.ls import list_projects_deployments
+from .command.ls.ls import list_projects_deployments
 
-from command.rm.rm import delete_project
+from .command.rm.rm import delete_project
 
-from command.whoami.whoami import whoami
+from .command.whoami.whoami import whoami
 
-from command.help.help import print_custom_help
-from command.help.help import help_command
+from .command.help.help import print_custom_help
+from .command.help.help import help_command
 
 from cryptography.fernet import Fernet
 
