@@ -61,11 +61,12 @@ jobs:
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
           files: |
             dist/*
-        env:
-          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          token: RELEASE_TOKEN
 
   cleanup:
     needs: [build, release]
