@@ -70,7 +70,7 @@ jobs:
         #   RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
           files: |
-            dist/*
+            dist/*/*
           token: ${{ secrets.RELEASE_TOKEN }}
 
   cleanup:
