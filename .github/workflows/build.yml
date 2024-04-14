@@ -31,6 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Update version in version.py
+        run: |
+          sed -i "s/__version__ = \".*\"/__version__ = \"${GITHUB_REF#refs/tags/}\"/" retrodeep/version.py
+
       - name: Set up Python
         uses: actions/setup-python@v3
         with:
@@ -69,9 +73,22 @@ jobs:
         # env:
         #   RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
+          # body: |
+          #   Full Changelog: https://github.com/${{ github.repository }}/compare/${{ github.event.release.target_commitish }}...${GITHUB_REF#refs/tags/}
           files: |
             dist/*/*
           token: ${{ secrets.RELEASE_TOKEN }}
+      - name: Update install.sh with latest version tag
+        run: |
+          sed -i "s/RETRODEEP_VERSION=\".*\"/RETRODEEP_VERSION=\"${GITHUB_REF#refs/tags/}\"/" install.sh
+      - name: Upload install.sh to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: "eu-west-1"
+          S3_INSTALL_BUCKET: ${{ secrets.S3_INSTALL_BUCKET }}
+        run: |
+          aws s3 cp ./install.sh s3://${S3_INSTALL_BUCKET}/install.sh --acl public-read
 
   cleanup:
     needs: [build, release]
