@@ -48,7 +48,7 @@ jobs:
 
       - name: Build binary with PyInstaller
         run: |
-          pyinstaller --onefile --name ${{ matrix.binary-name }} retrodeep/retrodeep.py
+          pyinstaller --onedir --name ${{ matrix.binary-name }} retrodeep/retrodeep.py
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
