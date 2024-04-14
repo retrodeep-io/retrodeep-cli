@@ -86,7 +86,7 @@ def Exit_gracefully(signum, frame):
 def main():
     print(f"{Style.DIM}{Style.GREY}Retrodeep CLI {__version__}{Style.RESET}")
 
-    if "-h" in sys.argv or "--help" in sys.argv or "help" in sys.argv:
+    if "-h" in sys.argv or "--help" in sys.argv in sys.argv:
         print_custom_help()
         sys.exit()
 
