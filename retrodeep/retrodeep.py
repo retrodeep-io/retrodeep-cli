@@ -83,8 +83,7 @@ def Exit_gracefully(signum, frame):
     # exit(1)
     sys.exit(1)
 
-if __name__ == "__main__":
-
+def main():
     print(f"{Style.DIM}{Style.GREY}Retrodeep CLI {__version__}{Style.RESET}")
 
     if "-h" in sys.argv or "--help" in sys.argv or "help" in sys.argv:
@@ -191,3 +190,7 @@ if __name__ == "__main__":
         init(debug=args.debug)
     else:
         args.func(args)
+
+if __name__ == "__main__":
+    main()
+    
