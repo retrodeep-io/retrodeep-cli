@@ -33,7 +33,7 @@ jobs:
 
       - name: Update version in version.py
         run: |
-          sed -i "s/__version__ = \".*\"/__version__ = \"${GITHUB_REF#refs/tags/}\"/" retrodeep/version.py
+          sed -i.bak "s/RETRODEEP_VERSION=\".*\"/RETRODEEP_VERSION=\"${GITHUB_REF#refs/tags/}\"/" install.sh && rm install.sh.bak
 
       - name: Set up Python
         uses: actions/setup-python@v3
