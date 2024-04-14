@@ -14,16 +14,14 @@ class Style:
 
 def logout(args):
     retrodeep_dir = os.path.join(os.path.expanduser('~'), '.retrodeep')
-
     credentials_path = os.path.join(retrodeep_dir, 'credentials.json')
     
     if os.path.isfile(credentials_path):
-        with yaspin(text=f"{Style.BOLD}Logging out...{Style.RESET}", color="cyan") as spinner:
-          try:
-              os.remove(credentials_path)
-              spinner.ok("✔ Log out successful!")
-          except Exception as e:
-              spinner.fail(f"✘ Error during logout: {e}")
-              sys.exit(1)
+        try:
+            os.remove(credentials_path)
+            print("> Log out successful!")
+        except Exception as e:
+            print(f"> Error during logout: {e}")
+            sys.exit(1)
     else:
         print("> You are not currently logged in to retrodeep.")
