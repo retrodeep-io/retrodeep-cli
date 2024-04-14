@@ -10,8 +10,8 @@ RetroDeep CLI requires Python 3.9 or higher.
 
 ### Homebrew (macOS and Linux)
 
-```sh
-brew tap retrodeep-io/retrodeep-cli
+```bash
+brew tap retrodeep-io/homebrew-retrodeep-cli
 brew install retrodeep-cli
 ```
 
@@ -19,7 +19,7 @@ brew install retrodeep-cli
 
 You can install the RetroDeep CLI directly using curl with the following command:
 
-```sh
+```bash
 curl -fsSL https://get.retrodeep.com | bash
 ```
 
@@ -27,7 +27,7 @@ curl -fsSL https://get.retrodeep.com | bash
 
 After installation, you can start using the RetroDeep CLI by running retrodeep. For detailed command usage and options, refer to:
 
-```sh
+```bash
 retrodeep --help
 ```
 
