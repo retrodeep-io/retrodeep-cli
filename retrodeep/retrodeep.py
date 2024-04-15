@@ -28,6 +28,7 @@ from retrodeep.command.whoami.whoami import whoami
 
 from retrodeep.command.help.help import print_custom_help
 from retrodeep.command.help.help import help_command
+from retrodeep.command.help.help import help_command2
 
 from cryptography.fernet import Fernet
 
@@ -86,8 +87,28 @@ def Exit_gracefully(signum, frame):
 def main():
     print(f"{Style.DIM}{Style.GREY}Retrodeep CLI {__version__}{Style.RESET}")
 
-    if "-h" in sys.argv or "--help" in sys.argv in sys.argv:
-        print_custom_help()
+    if "-h" in sys.argv or "--help" in sys.argv:
+        # Determine which command's help to show
+        if 'logs' in sys.argv:
+            help_command2('login')
+        elif 'ls' in sys.argv:
+            help_command2("ls")
+        elif 'deploy' in sys.argv:
+            help_command2("deploy")
+        elif 'dev' in sys.argv:
+            help_command2("dev")
+        elif 'login' in sys.argv:
+            help_command2("login")
+        elif 'logout' in sys.argv:
+            help_command2("logout")
+        elif 'projects' in sys.argv:
+            help_command2("projects")
+        elif 'rm' in sys.argv:
+            help_command2("rm")
+        elif 'whoami' in sys.argv:
+            help_command2("whoami")
+        else:
+            print_custom_help()
         sys.exit()
 
     signal.signal(signal.SIGINT, Exit_gracefully)
@@ -180,6 +201,8 @@ def main():
         "help", help="displays command from a command")
     parser_help_command.add_argument(
         "command",
+        nargs='?',  # Makes the argument optional
+        default='all',
         help="Name of the command")
     parser_help_command.set_defaults(func=help_command)
 

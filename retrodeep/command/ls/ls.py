@@ -1,6 +1,7 @@
 import requests
 from datetime import datetime, timedelta
 from ..login.login import login_for_workflow
+from tabulate import tabulate
 
 API_BASE_URL = "https://api.retrodeep.com/v1"
 
