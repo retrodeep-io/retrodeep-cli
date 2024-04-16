@@ -137,6 +137,7 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
 
     # Fetch and select a branch from the repository
     branches = list_repo_branches(token, repo_name, username)
+
     if branches:
         branch_questions = [
             {
@@ -303,7 +304,7 @@ def init(debug=False):
         # turn the above line off to not print error
         sys.exit(e)
     except Exception as e:
-        # traceback.print_exc()  # This will print the stack trace of the exception
+        traceback.print_exc()  # This will print the stack trace of the exception
         # turn the above line off to not print error
         sys.exit(1)  # Exit after printing the error details
     except:

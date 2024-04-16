@@ -34,6 +34,7 @@ from cryptography.fernet import Fernet
 
 from retrodeep.version import __version__
 
+
 # framework = None
 
 # ANSI escape codes for colors and styles
