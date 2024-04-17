@@ -133,10 +133,11 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     """
     source = 'github'
     repos = list_user_repos(token)
-    repo_name = display_repos_and_select(repos)
+    repo_full_name = display_repos_and_select(repos)
+    repo_name = get_repo_name_from_full_repo_name(repo_full_name)
 
     # Fetch and select a branch from the repository
-    branches = list_repo_branches(token, repo_name, username)
+    branches = list_repo_branches(token, repo_full_name, username)
 
     if branches:
         branch_questions = [
@@ -154,7 +155,7 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         sys.exit(1)
 
     # Fetch the directories from the repository
-    directories = get_repo_directories(token, username, repo_name, branch_name)
+    directories = get_repo_directories(token, repo_full_name, branch_name)
 
     name_of_project = name_of_project_prompt_repo(repo_name, username, retrodeep_access_token)
 
@@ -175,11 +176,12 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     dir_answer = prompt(questions)
     directory = dir_answer['directory']
 
-    directory_contents = get_repo_directory_contents(token, username, repo_name, branch_name, strip_dot_slash(directory))
+    directory_contents = get_repo_directory_contents(token, repo_full_name, repo_name, branch_name, strip_dot_slash(directory))
 
     # Check for package.json in the directory contents
     if 'package.json' in directory_contents:
-        package_json_content = get_file_content(token, username, repo_name, branch_name, f"{directory}/package.json")
+        temp_dir = f"{directory}/package.json"
+        package_json_content = get_file_content(token, repo_full_name, branch_name, strip_dot_slash(temp_dir))
         project_framework = analyze_package_json(package_json_content)
     else:
         # Check for HTML files as a fallback
@@ -233,10 +235,10 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
     with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
         # Fork the selected repository to the organization
         if project_framework == "html":
-            workflow = deploy(email, repo_name, branch_name, name_of_project,
+            workflow = deploy(email, repo_full_name, repo_name, branch_name, name_of_project,
                           directory, project_framework, source, username, retrodeep_access_token)
         else:
-            workflow = deploy(email, repo_name, branch_name, name_of_project,
+            workflow = deploy(email, repo_full_name, repo_name, branch_name, name_of_project,
                           directory, project_framework, source, username, retrodeep_access_token, install_command,build_command, build_output)
 
         deployment_params = listen_to_sse(workflow.get('deployment_id'))
@@ -304,7 +306,7 @@ def init(debug=False):
         # turn the above line off to not print error
         sys.exit(e)
     except Exception as e:
-        traceback.print_exc()  # This will print the stack trace of the exception
+        # traceback.print_exc()  # This will print the stack trace of the exception
         # turn the above line off to not print error
         sys.exit(1)  # Exit after printing the error details
     except:
@@ -503,20 +505,20 @@ def display_repos_and_select(repos):
     page = 1
     per_page = 10
     total_items = len(repos)
-    selected_repo = None
+    selected_repo_full_name = None
 
     while True:
         # Calculate start and end indices for the current page
-        start_index = (page - 1) * per_page + 1
-        end_index = start_index + per_page - 1
+        start_index = (page - 1) * per_page
+        end_index = start_index + per_page
         if end_index > total_items:
             end_index = total_items
 
-        paginated_repos = paginate_repos(repos, page, per_page)
-        for i, repo in enumerate(paginated_repos, start=1):
-            print(f"{Style.GREY}{i}{Style.RESET} {repo}")
+        paginated_repos = repos[start_index:end_index]
+        for i, repo in enumerate(paginated_repos, start=start_index + 1):
+            print(f"{Style.GREY}{i}{Style.RESET} {repo.name}")
         
-        print(f"{Style.GREY}Showing Items {start_index}-{end_index} of {total_items}{Style.RESET}")
+        print(f"{Style.GREY}Showing Items {start_index+1}-{end_index} of {total_items}{Style.RESET}")
 
         repo_choice_question = {
             'type': 'input',
@@ -528,14 +530,14 @@ def display_repos_and_select(repos):
         
         if user_input.isdigit():
             repo_index = int(user_input) - 1
-            if repo_index >= 0 and repo_index < len(paginated_repos):
-                selected_repo = paginated_repos[repo_index]
-                print(f"> You have selected the repository: {Style.BOLD}{selected_repo}{Style.RESET}")
+            if repo_index >= start_index and repo_index < end_index:
+                selected_repo_full_name = paginated_repos[repo_index - start_index].full_name
+                print(f"> You have selected the repository: {Style.BOLD}{selected_repo_full_name}{Style.RESET}")
                 break
             else:
                 print("Invalid selection. Please try again.")
         elif user_input == 'n':
-            if page * per_page < len(repos):
+            if page * per_page < total_items:
                 page += 1
             else:
                 print("You are on the last page.")
@@ -545,12 +547,14 @@ def display_repos_and_select(repos):
             else:
                 print("You are on the first page.")
         elif user_input == 's':
-            selected_repo = search_and_select_repo(repos)
-            break
+            # Assuming search_and_select_repo returns the full_name of the repo
+            selected_repo_full_name = search_and_select_repo(repos)  # Implement or modify this function as needed
+            if selected_repo_full_name:
+                break
         elif user_input == 'q':
             break
 
-    return selected_repo
+    return selected_repo_full_name
 
 
 def search_and_select_repo(repos):
@@ -565,14 +569,14 @@ def search_and_select_repo(repos):
 
         search_term = prompt(search_repo_question)['search_repo_choice']
         
-        filtered_repos = [repo for repo in repos if search_term.lower() in repo.lower()] if search_term else None
+        filtered_repos = [repo for repo in repos if search_term.lower() in repo.name.lower()] if search_term else None
         
         if not filtered_repos:
             print("No repositories found. Try again.")
             continue
 
         for i, repo in enumerate(filtered_repos, start=1):
-            print(f"{Style.GREY}{i}{Style.RESET} {repo}")
+            print(f"{Style.GREY}{i}{Style.RESET} {repo.name}")
         
         # repo_input = input("Enter a number to select a repo, or 'r' to refine your search: ").lower()
 
@@ -588,33 +592,52 @@ def search_and_select_repo(repos):
             repo_index = int(repo_input) - 1
             if 0 <= repo_index < len(filtered_repos):
                 selected_repo = filtered_repos[repo_index]
-                print(f"You have selected the repository: {Style.BOLD}{selected_repo}{Style.RESET}")
-                return selected_repo
+                print(f"You have selected the repository: {Style.BOLD}{selected_repo.name}{Style.RESET}")
+                return selected_repo.full_name
             else:
                 print("> Invalid selection. Please try again.")
-        elif repo_input == 'r':
+        elif repo_input.lower == 'r':
             continue
         else:
             print("> Invalid input. Please try again or refine your search.")
 
+def get_repo_name_from_full_repo_name(repo):
+    if hasattr(repo, 'full_name'):
+        full_repo_name = repo.full_name
+    else:
+        full_repo_name = repo
+    
+    parts = full_repo_name.rsplit('/', 1)
+    if len(parts) == 2:
+        return parts[1]  
+    return None  
+
+def get_full_name_from_repo_object(repo):
+    # Check if the input object has the attribute 'full_name'
+    if hasattr(repo, 'full_name'):
+        return repo.full_name
+    else:
+        raise AttributeError("The given object does not have a 'full_name' attribute")
+
 def list_user_repos(token):
     g = Github(token)
     user = g.get_user()
-    return [repo.name for repo in user.get_repos()]
+    repos = user.get_repos()
+    return list(repos) 
 
-def list_repo_branches(token, repo_name, username):
+def list_repo_branches(token, repo_full_name, username):
     g = Github(token)
-    repo_full_name = f"{username}/{repo_name}"
+    # repo_full_name = f"{username}/{repo_name}"
     repo = g.get_repo(repo_full_name)
     return [branch.name for branch in repo.get_branches()]
 
-def get_repo_directories(token, org_name, repo_name, branch_name, path="."):
+def get_repo_directories(token, repo_full_name, branch_name, path="."):
     headers = {
         'Authorization': f'token {token}',
         'Accept': 'application/vnd.github.v3+json'
     }
 
-    url = f"https://api.github.com/repos/{org_name}/{repo_name}/contents/{path}?ref={branch_name}"
+    url = f"https://api.github.com/repos/{repo_full_name}/contents/{path}?ref={branch_name}"
     
     try:
         response = requests.get(url, headers=headers)
@@ -627,7 +650,7 @@ def get_repo_directories(token, org_name, repo_name, branch_name, path="."):
                 subdir_path = f"{path}/{item['name']}" if path != "." else item['name']
                 directories.append(subdir_path)
                 directories.extend(get_repo_directories(
-                    token, org_name, repo_name, branch_name, subdir_path))
+                    token, repo_full_name, branch_name, subdir_path))
         return directories
     except HTTPError as http_err:
         print(f"{Style.RED}Error:{Style.RESET} HTTP error occurred: {http_err} - {response.status_code}")
@@ -664,7 +687,7 @@ def name_of_project_prompt_repo(repo_name, username, retrodeep_access_token):
 
     return name_of_project
 
-def get_repo_directory_contents(token, username, repo_name, branch_name, directory_path):
+def get_repo_directory_contents(token, repo_full_name, repo_name, branch_name, directory_path):
     """
     Fetch the contents of a directory in a GitHub repository.
 
@@ -675,8 +698,10 @@ def get_repo_directory_contents(token, username, repo_name, branch_name, directo
     :param directory_path: Path to the directory within the repository
     :return: A list of filenames in the specified directory
     """
+
+    
     # Format the GitHub API URL for the contents endpoint
-    api_url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{directory_path}?ref={branch_name}"
+    api_url = f"https://api.github.com/repos/{repo_full_name}/contents/{directory_path}?ref={branch_name}"
 
     # Include the token in the request headers for authentication
     headers = {'Authorization': f'token {token}'}
@@ -695,7 +720,7 @@ def get_repo_directory_contents(token, username, repo_name, branch_name, directo
         print(f"Failed to fetch directory contents: {response.status_code}")
         return []
     
-def get_file_content(token, username, repo_name, branch_name, file_path):
+def get_file_content(token, repo_full_name, branch_name, file_path):
     """
     Fetch the content of a file from a GitHub repository.
 
@@ -707,7 +732,7 @@ def get_file_content(token, username, repo_name, branch_name, file_path):
     :return: The content of the file as a string.
     """
     # Format the GitHub API URL for the contents endpoint, including the file path
-    api_url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{file_path}?ref={branch_name}"
+    api_url = f"https://api.github.com/repos/{repo_full_name}/contents{file_path}?ref={branch_name}"
 
     # Include the token in the request headers for authentication
     headers = {'Authorization': f'token {token}'}
@@ -746,12 +771,13 @@ def confirm_action(prompt):
     else:
         sys.exit(1)
 
-def deploy(email, repo_name, branch, project_name, directory, framework, source, username, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
+def deploy(email, repo_full_name, repo_name, branch, project_name, directory, framework, source, username, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
     url = f"{API_BASE_URL}/deploy"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
     data = {
             'email': email,
             'repo_name': repo_name,
+            'repo_full_name': repo_full_name,
             'branch': branch,
             'project_name': project_name,
             'directory': directory,

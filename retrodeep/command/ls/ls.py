@@ -22,7 +22,28 @@ def list_projects_deployments(args):
     email = credentials['email_address']
     retrodeep_access_token = credentials['retrodeep_access_token']
 
-    get_project_deployments(username, retrodeep_access_token, email, args.deployment_url)
+    deployment_url = args.deployment_url
+    if deployment_url is None:
+        print(f"{Style.RED}Error:{Style.RESET} '{Style.BOLD}retrodeep rm{Style.RESET}' is missing required argument 'project name'")
+        print(
+          f"""
+ Usage: {Style.BOLD}retrodeep ls{Style.RESET} [project name | project ID]
+
+ Remove a project deployment via ID or name..
+
+ List all deployments for a project/app.
+
+ Options:
+ -h, --help            
+
+ Examples:
+
+ - List all deployments for the project 'test-app'
+
+   $ retrodeep ls test-app
+     """)
+    else:
+        get_project_deployments(username, retrodeep_access_token, email, args.deployment_url)
         
 def get_project_deployments(username, retrodeep_access_token, email_address, project_name):
     url = f"{API_BASE_URL}/deployments"

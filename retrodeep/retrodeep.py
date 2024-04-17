@@ -34,6 +34,32 @@ from cryptography.fernet import Fernet
 
 from retrodeep.version import __version__
 
+# from command.login.login import login
+
+# from command.logout.logout import logout
+
+# from command.dev.dev import dev
+ 
+# from command.deploy.deploy import deploy_using_flags 
+# from command.deploy.deploy import init 
+
+# from command.logs.logs import fetch_and_display_logs
+
+# from command.projects.projects import list_projects
+
+# from command.ls.ls import list_projects_deployments
+
+# from command.rm.rm import delete_project
+
+# from command.whoami.whoami import whoami
+
+# from command.help.help import print_custom_help
+# from command.help.help import help_command
+# from command.help.help import help_command2
+
+# from cryptography.fernet import Fernet
+
+# from version import __version__
 
 # framework = None
 
@@ -171,7 +197,7 @@ def main():
         "deployment_url",
         nargs='?',
         default=None,
-        help="")
+        help="Delete a project deployment")
     parser_logsProjects.set_defaults(func=list_projects_deployments)
 
     # rollout deployment command

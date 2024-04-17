@@ -52,34 +52,6 @@ def get_user_projects(username, retrodeep_access_token, email_address):
         print(
             f"Failed to retrieve projects for {username}. Status Code: {response.status_code}")
         
-def get_project_deployments(username, retrodeep_access_token, email_address, project_name):
-    url = f"{API_BASE_URL}/deployments"
-    headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
-    data = {'username': username, 'project_name':project_name}
-    response = requests.get(url, json=data, headers=headers)
-
-    if response.status_code == 200:
-        deployments_data = response.json()
-
-        if not deployments_data:  # Check if the projects list is empty
-            print(f"No deployments found for {username}.")
-            return
-
-        deployment_list = [
-            {
-                f'{Style.BOLD}Deployment ID{Style.RESET}': f"{Style.BOLD}{deployment['deployment_id']}{Style.RESET}",
-                f'{Style.BOLD}Deployment{Style.RESET}': f"https://{deployment['url']}",
-                f'{Style.BOLD}Status{Style.RESET}': f"{Style.BOLD}{deployment['status']}{Style.RESET}",
-                f'{Style.BOLD}Created{Style.RESET}': format_days_since(deployment['created_at'])
-            }
-            for deployment in deployments_data
-        ]
-        print(f"> Deployments of project {Style.BOLD}{project_name}{Style.RESET} for user {Style.BOLD}{username}{Style.RESET}\n")
-        print(tabulate(deployment_list, headers='keys', tablefmt='plain'))
-    else:
-        print(
-            f"Failed to retrieve Deployments for {project_name}. Status Code: {response.status_code}")
-        
 def format_days_since(updated_at_str):
     updated_at = datetime.strptime(updated_at_str, '%a, %d %b %Y %H:%M:%S %Z')
     time_diff = datetime.utcnow() - updated_at
