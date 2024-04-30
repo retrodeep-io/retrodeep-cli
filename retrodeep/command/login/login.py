@@ -2,12 +2,15 @@ import requests
 import webbrowser
 from questionary import prompt
 import json
+import os
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 import sys
 import uuid
 from yaspin import yaspin
 from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
+
 # from PyInquirer import prompt
 
 AUTH_BASE_URL = "https://auth.retrodeep.com"
@@ -24,8 +27,16 @@ class Style:
 def get_stored_credentials():
     credentials_file = Path.home() / '.retrodeep' / 'credentials.json'
     if credentials_file.exists():
-        with open(credentials_file, 'r') as file:
-            return json.load(file)
+        # Get the last modified time of the file
+        last_modified_time = os.path.getmtime(credentials_file)
+        last_modified_date = datetime.fromtimestamp(last_modified_time)
+        
+        # Check if the last modification was within the last 5 days
+        if datetime.now() - last_modified_date < timedelta(days=5):
+            with open(credentials_file, 'r') as file:
+                return json.load(file)
+        else:
+            return False
     else:
         return False
       

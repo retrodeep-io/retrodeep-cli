@@ -236,10 +236,10 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         # Fork the selected repository to the organization
         if project_framework == "html":
             workflow = deploy(email, repo_full_name, repo_name, branch_name, name_of_project,
-                          directory, project_framework, source, username, retrodeep_access_token)
+                          directory, token, project_framework, source, username, retrodeep_access_token)
         else:
             workflow = deploy(email, repo_full_name, repo_name, branch_name, name_of_project,
-                          directory, project_framework, source, username, retrodeep_access_token, install_command,build_command, build_output)
+                          directory, token, project_framework, source, username, retrodeep_access_token, install_command,build_command, build_output)
 
         deployment_params = listen_to_sse(workflow.get('deployment_id'))
         
@@ -771,10 +771,11 @@ def confirm_action(prompt):
     else:
         sys.exit(1)
 
-def deploy(email, repo_full_name, repo_name, branch, project_name, directory, framework, source, username, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
+def deploy(email, repo_full_name, repo_name, branch, project_name, directory, token, framework, source, username, retrodeep_access_token, install_command=None, build_command=None, build_output=None):
     url = f"{API_BASE_URL}/deploy"
     headers = {'Authorization': f'Bearer {retrodeep_access_token}'}
     data = {
+            'token': token,
             'email': email,
             'repo_name': repo_name,
             'repo_full_name': repo_full_name,
