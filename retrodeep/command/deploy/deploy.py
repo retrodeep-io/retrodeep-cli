@@ -264,6 +264,8 @@ def deploy_from_repo(token, username, email, retrodeep_access_token):
         print("> 🎉 Congratulations! Your project is now up and running.")
 
 def init(debug=False):
+    if debug:
+      print("> Debug mode enabled")
     # Check for existing credentials
     credentials = get_stored_credentials()
     if credentials:
@@ -306,127 +308,181 @@ def init(debug=False):
         # turn the above line off to not print error
         sys.exit(e)
     except Exception as e:
-        # traceback.print_exc()  # This will print the stack trace of the exception
+        if debug:
+              traceback.print_exc()  # Print stack trace only if debugging is enabled
         # turn the above line off to not print error
         sys.exit(1)  # Exit after printing the error details
     except:
         raise SystemExit()
 
 def deploy_using_flags(args):
-    source = "local"
-
-    credentials = login_for_workflow()
-    token = credentials['access_token']
-    username = credentials['username']
-    email = credentials['email_address']
-    retrodeep_access_token = credentials['retrodeep_access_token']
-
-
-    absolute_path = os.path.abspath(args.directory)
-
-    if  os.path.exists(absolute_path) == False and os.path.isdir(absolute_path) == False:
-        print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} does not exist.")
-        sys.exit(1)
-    
-    if args.directory and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
-            dir_size = get_dir_size(absolute_path)
-            if dir_size > one_gb:
-                print(f"{Style.RED} Error:{Style.RESET} The file size {Style.BOLD}{dir_size}{Style.RESET} exceeds the maximum allowed size of 1GB")
-                sys.exit(1)
-
-    framework = check_files_and_framework_local(absolute_path)
-
-    if not framework:
-        print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} has no {Style.BOLD}.html{Style.RESET} file.")
-        sys.exit(1)
-
-    dir_name = os.path.basename(os.path.normpath(absolute_path))
-    
-    if check_project_exists(username, dir_name, retrodeep_access_token):
-        print(f"> A project with the name {Style.BOLD}{dir_name}{Style.RESET} already exists.")
-        project_name = generate_domain_name(dir_name)
-    else:
-        project_name = dir_name
-
-    if glob.glob(os.path.join(absolute_path, '*.html')):
-        print(f"> You are about to deploy the project {Style.BOLD}{project_name}{Style.RESET} from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
-    else:
-        print("> There is no .html file in the provided path.")
-        sys.exit(1)
-    
-    if not confirm_action(f"> {Style.CYAN}{Style.BOLD}Do you want to continue?{Style.RESET}"):
-        print("> Operation canceled")
-        sys.exit(0)
-
-    zip_file_path = compress_directory(absolute_path, dir_name)
-
-    start_time = time.time()
-
-    with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
-
-        workflow = deploy_local(zip_file_path, email, project_name, source, username, "./", retrodeep_access_token)
-
-        os.remove(zip_file_path)
-
-        deployment_params = listen_to_sse(workflow.get('deployment_id'))
-        
-        if deployment_params.get("status") == "Failed":
-            spinner.fail("✘")
-        else:
-            spinner.ok("✔")
-    
-    duration = round(time.time() - start_time, 2)
-
-    if deployment_params.get("status") == "Failed":
-        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
-            spinner.fail("✘")
-        print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
-        sys.exit(1)
-    else:
-        with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
-            spinner.ok("✔")
+    try:
+      if args.directory is None:
+        print(f"{Style.RED}Error:{Style.RESET}: Deployment directory is required.")
         print(
-            f"> 🔗 Your website is live at: {Style.BOLD}{deployment_params['url2']}{Style.RESET}")
-        print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
-        print("> 🎉 Congratulations! Your project is now up and running.")
+          f"""
+ Usage: {Style.BOLD}retrodeep deploy{Style.RESET} [project-name] [project-path]
+
+ Deploy your project from your local machine to Retrodeep. You can use "retrodeep"
+ to choose between deploying from your repository or local machine.
+
+ options:
+ -h, --help            show this help message and exit
+ -d, --debug           Enable debug
+ -v, --version         show program's version number and exit
+
+ Examples:
+
+  - Deploy from local or reppository
+
+   $ retrodeep
+
+ - Deploy the current directory
+
+   $ retrodeep deploy .
+
+ - Deploy a custom path
+
+   $ retrodeep deploy /path/to/your/project
+
+ - Print Deployment URL to a file
+
+   $ retrodeep > deployment-url.txt
+	    """)
+      else:
+        debug = args.debug
+        source = "local"
+
+        credentials = login_for_workflow()
+        token = credentials['access_token']
+        username = credentials['username']
+        email = credentials['email_address']
+        retrodeep_access_token = credentials['retrodeep_access_token']
+
+
+        absolute_path = os.path.abspath(args.directory)
+
+        if  os.path.exists(absolute_path) == False and os.path.isdir(absolute_path) == False:
+            print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} does not exist.")
+            sys.exit(1)
+        
+        if args.directory and os.path.exists(absolute_path) and os.path.isdir(absolute_path):
+                dir_size = get_dir_size(absolute_path)
+                if dir_size > one_gb:
+                    print(f"{Style.RED} Error:{Style.RESET} The file size {Style.BOLD}{dir_size}{Style.RESET} exceeds the maximum allowed size of 1GB")
+                    sys.exit(1)
+
+        framework = check_files_and_framework_local(absolute_path)
+
+        if not framework:
+            print(f"> The specified directory {Style.BOLD}{absolute_path}{Style.RESET} has no {Style.BOLD}.html{Style.RESET} file.")
+            sys.exit(1)
+
+        dir_name = os.path.basename(os.path.normpath(absolute_path))
+        
+        if check_project_exists(username, dir_name, retrodeep_access_token):
+            print(f"> A project with the name {Style.BOLD}{dir_name}{Style.RESET} already exists.")
+            project_name = generate_domain_name(dir_name)
+        else:
+            project_name = dir_name
+
+        if glob.glob(os.path.join(absolute_path, '*.html')):
+            print(f"> You are about to deploy the project {Style.BOLD}{project_name}{Style.RESET} from the directory: {Style.BOLD}{absolute_path}{Style.RESET}")
+        else:
+            print("> There is no .html file in the provided path.")
+            sys.exit(1)
+        
+        if not confirm_action(f"> {Style.CYAN}{Style.BOLD}Do you want to continue?{Style.RESET}"):
+            print("> Operation canceled")
+            sys.exit(0)
+
+        zip_file_path = compress_directory(absolute_path, dir_name)
+
+        start_time = time.time()
+
+        with yaspin(text=f"{Style.BOLD}Initializing Deployment...{Style.RESET}", color="cyan") as spinner:
+
+            workflow = deploy_local(zip_file_path, email, project_name, source, username, "./", retrodeep_access_token)
+
+            os.remove(zip_file_path)
+
+            deployment_params = listen_to_sse(workflow.get('deployment_id'))
+            
+            if deployment_params.get("status") == "Failed":
+                spinner.fail("✘")
+            else:
+                spinner.ok("✔")
+        
+        duration = round(time.time() - start_time, 2)
+
+        if deployment_params.get("status") == "Failed":
+            with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
+                spinner.fail("✘")
+            print (f"{Style.RED}Error:{Style.RESET} Deployment Failed {Style.GREY}[{duration}s]{Style.RESET}")
+            sys.exit(1)
+        else:
+            with yaspin(text=f"{Style.BOLD}Deploy Succeeded {Style.RESET}{Style.GREY}[{duration}s]{Style.RESET}", color="cyan") as spinner:
+                spinner.ok("✔")
+            print(
+                f"> 🔗 Your website is live at: {Style.BOLD}{deployment_params['url2']}{Style.RESET}")
+            print(f"> 🧪 Deployment: {Style.BOLD}{deployment_params['url4']}{Style.RESET}")
+            print("> 🎉 Congratulations! Your project is now up and running.")
+      
+    except ConnectionError:
+        print(f"{Style.RED}Error:{Style.RESET} Failed to deploy due to network issues. Please check your internet connection.")
+    except TimeoutError:
+        print(f"{Style.RED}Error:{Style.RESET} The deployment process timed out. Please try again later.")
+    except SystemExit as e:
+        # print(f"Exiting: {e}")
+        # turn the above line off to not print error
+        sys.exit(e)
+    except Exception as e:
+        if debug:
+          print("bitch ass nigga")
+          traceback.print_exc()  # Print stack trace only if debugging is enabled
+        # turn the above line off to not print error
+        sys.exit(1)  # Exit after printing the error details
+    except:
+        raise SystemExit()
+          
 
 def get_dir_size(path):
-    """Calculate the total size of all files in the specified directory."""
-    total_size = 0
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            filepath = os.path.join(root, file)
-            # Skip if it is symbolic link
-            if not os.path.islink(filepath):
-                total_size += os.path.getsize(filepath)
-    return total_size
+  """Calculate the total size of all files in the specified directory."""
+  total_size = 0
+  for root, dirs, files in os.walk(path):
+      for file in files:
+          filepath = os.path.join(root, file)
+          # Skip if it is symbolic link
+          if not os.path.islink(filepath):
+              total_size += os.path.getsize(filepath)
+  return total_size
 
 def name_of_project_prompt(absolute_path, username, retrodeep_access_token):
 
-    dir_name = os.path.basename(os.path.normpath(absolute_path))
+  dir_name = os.path.basename(os.path.normpath(absolute_path))
 
-    if check_project_exists(username, dir_name, retrodeep_access_token):
-        dir_name = generate_domain_name(dir_name)
+  if check_project_exists(username, dir_name, retrodeep_access_token):
+      dir_name = generate_domain_name(dir_name)
 
-    while True:
-        project_name_question = {
-        'type': 'input',
-        'name': 'project_name',
-        'message': f'Enter the project name (for subdomain):',
-        'default': f'{dir_name}'
-    }
-        project_name = prompt(project_name_question)['project_name']
-        
-        if not project_name:
-            project_name = dir_name
+  while True:
+      project_name_question = {
+      'type': 'input',
+      'name': 'project_name',
+      'message': f'Enter the project name (for subdomain):',
+      'default': f'{dir_name}'
+  }
+      project_name = prompt(project_name_question)['project_name']
+      
+      if not project_name:
+          project_name = dir_name
 
-        # Check if project exists
-        if check_project_exists(username, project_name, retrodeep_access_token):
-            print(f"> Project {Style.BOLD}{project_name}{Style.RESET} already exists, please choose a new name.")
-        else:
-            break
+      # Check if project exists
+      if check_project_exists(username, project_name, retrodeep_access_token):
+          print(f"> Project {Style.BOLD}{project_name}{Style.RESET} already exists, please choose a new name.")
+      else:
+          break
 
-    return project_name
+  return project_name
 
 def compress_directory(source_dir, output_filename):
     # List all files in the directory to be compressed to determine the total for the progress bar

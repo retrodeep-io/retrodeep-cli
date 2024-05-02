@@ -7,59 +7,59 @@ import http.server
 import socketserver
 import ssl
 
-from retrodeep.command.login.login import login
+# from retrodeep.command.login.login import login
 
-from retrodeep.command.logout.logout import logout
+# from retrodeep.command.logout.logout import logout
 
-from retrodeep.command.dev.dev import dev
+# from retrodeep.command.dev.dev import dev
  
-from retrodeep.command.deploy.deploy import deploy_using_flags 
-from retrodeep.command.deploy.deploy import init 
+# from retrodeep.command.deploy.deploy import deploy_using_flags 
+# from retrodeep.command.deploy.deploy import init 
 
-from retrodeep.command.logs.logs import fetch_and_display_logs
+# from retrodeep.command.logs.logs import fetch_and_display_logs
 
-from retrodeep.command.projects.projects import list_projects
+# from retrodeep.command.projects.projects import list_projects
 
-from retrodeep.command.ls.ls import list_projects_deployments
+# from retrodeep.command.ls.ls import list_projects_deployments
 
-from retrodeep.command.rm.rm import delete_project
+# from retrodeep.command.rm.rm import delete_project
 
-from retrodeep.command.whoami.whoami import whoami
+# from retrodeep.command.whoami.whoami import whoami
 
-from retrodeep.command.help.help import print_custom_help
-from retrodeep.command.help.help import help_command
-from retrodeep.command.help.help import help_command2
-
-from cryptography.fernet import Fernet
-
-from retrodeep.version import __version__
-
-# from command.login.login import login
-
-# from command.logout.logout import logout
-
-# from command.dev.dev import dev
- 
-# from command.deploy.deploy import deploy_using_flags 
-# from command.deploy.deploy import init 
-
-# from command.logs.logs import fetch_and_display_logs
-
-# from command.projects.projects import list_projects
-
-# from command.ls.ls import list_projects_deployments
-
-# from command.rm.rm import delete_project
-
-# from command.whoami.whoami import whoami
-
-# from command.help.help import print_custom_help
-# from command.help.help import help_command
-# from command.help.help import help_command2
+# from retrodeep.command.help.help import print_custom_help
+# from retrodeep.command.help.help import help_command
+# from retrodeep.command.help.help import help_command2
 
 # from cryptography.fernet import Fernet
 
-# from version import __version__
+# from retrodeep.version import __version__
+
+from command.login.login import login
+
+from command.logout.logout import logout
+
+from command.dev.dev import dev
+ 
+from command.deploy.deploy import deploy_using_flags 
+from command.deploy.deploy import init 
+
+from command.logs.logs import fetch_and_display_logs
+
+from command.projects.projects import list_projects
+
+from command.ls.ls import list_projects_deployments
+
+from command.rm.rm import delete_project
+
+from command.whoami.whoami import whoami
+
+from command.help.help import print_custom_help
+from command.help.help import help_command
+from command.help.help import help_command2
+
+from cryptography.fernet import Fernet
+
+from version import __version__
 
 # framework = None
 
@@ -146,15 +146,19 @@ def main():
                                      description='Deploy. Build. Scale',
                                      formatter_class=CustomFormatter)
     # Global flags
-    parser.add_argument('-d', '--debug', action='store_true', help='Enable debug')
+    parser.add_argument('--debug', action='store_true', help='Enable debug')
     parser.add_argument('-v', '--version', action='version', version=f"{__version__}")
-
+    
     subparsers = parser.add_subparsers(title="Commands", dest="command", help="")
 
     # Deploy command
     parser_deploy = subparsers.add_parser("deploy", help="Deploy your project from a local directory or from a git repository")
     # parser_deploy.add_argument("name", help="Name of the project")
-    parser_deploy.add_argument("directory",help="Directory path for deployment")
+    parser_deploy.add_argument(
+        "directory",
+        nargs='?',
+        default=None,
+        help="")
     parser_deploy.set_defaults(func=deploy_using_flags)
 
     # Dev command
@@ -233,7 +237,12 @@ def main():
         help="Name of the command")
     parser_help_command.set_defaults(func=help_command)
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
+
+    # Parse arguments to handle the global --debug flag first
+    args, remaining_argv = parser.parse_known_args()
+    if args.command:  
+        args = parser.parse_args(remaining_argv, args)
 
     # Default action if no subcommand is provided
     if not hasattr(args, 'func'):
