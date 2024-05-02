@@ -491,11 +491,11 @@ def compress_directory(source_dir, output_filename):
             file_path = os.path.join(root, file)
             file_paths.append(file_path)
 
-   with zipfile.ZipFile(f"{output_filename}.zip", 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zipf:
-        for file_path in file_paths:
-            # Create a relative path for files to keep the directory structure
-            relative_path = os.path.relpath(file_path, source_dir)
-            zipf.write(file_path, relative_path)
+    with zipfile.ZipFile(f"{output_filename}.zip", 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zipf:
+          for file_path in file_paths:
+              # Create a relative path for files to keep the directory structure
+              relative_path = os.path.relpath(file_path, source_dir)
+              zipf.write(file_path, relative_path)
 
     return f"{output_filename}.zip"
 
