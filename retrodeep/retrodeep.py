@@ -7,59 +7,59 @@ import http.server
 import socketserver
 import ssl
 
-# from retrodeep.command.login.login import login
+from retrodeep.command.login.login import login
 
-# from retrodeep.command.logout.logout import logout
+from retrodeep.command.logout.logout import logout
 
-# from retrodeep.command.dev.dev import dev
+from retrodeep.command.dev.dev import dev
  
-# from retrodeep.command.deploy.deploy import deploy_using_flags 
-# from retrodeep.command.deploy.deploy import init 
+from retrodeep.command.deploy.deploy import deploy_using_flags 
+from retrodeep.command.deploy.deploy import init 
 
-# from retrodeep.command.logs.logs import fetch_and_display_logs
+from retrodeep.command.logs.logs import fetch_and_display_logs
 
-# from retrodeep.command.projects.projects import list_projects
+from retrodeep.command.projects.projects import list_projects
 
-# from retrodeep.command.ls.ls import list_projects_deployments
+from retrodeep.command.ls.ls import list_projects_deployments
 
-# from retrodeep.command.rm.rm import delete_project
+from retrodeep.command.rm.rm import delete_project
 
-# from retrodeep.command.whoami.whoami import whoami
+from retrodeep.command.whoami.whoami import whoami
 
-# from retrodeep.command.help.help import print_custom_help
-# from retrodeep.command.help.help import help_command
-# from retrodeep.command.help.help import help_command2
-
-# from cryptography.fernet import Fernet
-
-# from retrodeep.version import __version__
-
-from command.login.login import login
-
-from command.logout.logout import logout
-
-from command.dev.dev import dev
- 
-from command.deploy.deploy import deploy_using_flags 
-from command.deploy.deploy import init 
-
-from command.logs.logs import fetch_and_display_logs
-
-from command.projects.projects import list_projects
-
-from command.ls.ls import list_projects_deployments
-
-from command.rm.rm import delete_project
-
-from command.whoami.whoami import whoami
-
-from command.help.help import print_custom_help
-from command.help.help import help_command
-from command.help.help import help_command2
+from retrodeep.command.help.help import print_custom_help
+from retrodeep.command.help.help import help_command
+from retrodeep.command.help.help import help_command2
 
 from cryptography.fernet import Fernet
 
-from version import __version__
+from retrodeep.version import __version__
+
+# from command.login.login import login
+
+# from command.logout.logout import logout
+
+# from command.dev.dev import dev
+ 
+# from command.deploy.deploy import deploy_using_flags 
+# from command.deploy.deploy import init 
+
+# from command.logs.logs import fetch_and_display_logs
+
+# from command.projects.projects import list_projects
+
+# from command.ls.ls import list_projects_deployments
+
+# from command.rm.rm import delete_project
+
+# from command.whoami.whoami import whoami
+
+# from command.help.help import print_custom_help
+# from command.help.help import help_command
+# from command.help.help import help_command2
+
+# from cryptography.fernet import Fernet
+
+# from version import __version__
 
 # framework = None
 

@@ -438,7 +438,6 @@ def deploy_using_flags(args):
         sys.exit(e)
     except Exception as e:
         if debug:
-          print("bitch ass nigga")
           traceback.print_exc()  # Print stack trace only if debugging is enabled
         # turn the above line off to not print error
         sys.exit(1)  # Exit after printing the error details
