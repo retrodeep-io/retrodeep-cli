@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RETRODEEP_VERSION="v1.0.0-beta.1"
+RETRODEEP_VERSION="v0.0.1"
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 echo "OS: ${OS}, CPU Architecture: ${ARCH} detected."
